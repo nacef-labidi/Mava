@@ -104,6 +104,7 @@ def main(_: Any) -> None:
         epsilon_min=0.01,
         epsilon_decay=0.999994,
         max_replay_size=500000,
+        samples_per_insert=None,
         importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.Adam(learning_rate=1e-3),
         checkpoint_subpath=checkpoint_dir,
