@@ -92,6 +92,7 @@ class MADQN:
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        record_experience: bool = False,
     ):
         """Initialise the system
 
@@ -245,6 +246,7 @@ class MADQN:
                 checkpoint=checkpoint,
                 optimizer=optimizer,
                 checkpoint_subpath=checkpoint_subpath,
+                record_experience=record_experience,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,

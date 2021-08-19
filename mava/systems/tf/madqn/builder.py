@@ -25,6 +25,7 @@ from acme import datasets
 from acme.tf import variable_utils
 from acme.utils import counting
 
+from mava.components.tf.recorder import ParallelTransitionRecordWriter
 from mava import adders, core, specs, types
 from mava.adders import reverb as reverb_adders
 from mava.components.tf.modules.communication import BaseCommunicationModule
@@ -89,6 +90,7 @@ class MADQNConfig:
     optimizer: Union[snt.Optimizer, Dict[str, snt.Optimizer]]
     replay_table_name: str = reverb_adders.DEFAULT_PRIORITY_TABLE
     checkpoint_subpath: str = "~/mava/"
+    record_experience: bool = False
 
 
 class MADQNBuilder:
@@ -296,6 +298,13 @@ class MADQNBuilder:
             # assigning variables before running the environment loop.
             variable_client.update_and_wait()
 
+        if self._config.record_experience:
+            recorder = ParallelTransitionRecordWriter(
+                self._agents, transitions_per_file=1000
+            )
+        else:
+            recorder = None
+
         # Create the executor which coordinates the actors.
         return self._executor_fn(
             q_networks=q_networks,
@@ -306,6 +315,7 @@ class MADQNBuilder:
             trainer=trainer,
             evaluator=evaluator,
             fingerprint_module=fingerprint_module,
+            recorder=recorder,
         )
 
     def make_trainer(

@@ -48,7 +48,7 @@ flags.DEFINE_string("base_dir", "logs", "Base dir to store experiments.")
 
 # flatland environment config
 rail_gen_cfg: Dict = {
-    "max_num_cities": 4,
+    "max_num_cities": 2,
     "max_rails_between_cities": 2,
     "max_rails_in_city": 3,
     "grid_mode": False,
@@ -56,7 +56,7 @@ rail_gen_cfg: Dict = {
 }
 
 flatland_env_config: Dict = {
-    "number_of_agents": 5,
+    "number_of_agents": 3,
     "width": 25,
     "height": 25,
     "rail_generator": sparse_rail_generator(**rail_gen_cfg),
@@ -98,13 +98,14 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=3,
+        num_executors=1,
         exploration_scheduler=ExponentialExplorationScheduler,
         # fingerprint_fn=FingerPrintStabalisation,
         epsilon_min=0.01,
         epsilon_decay=0.999994,
         max_replay_size=500000,
         samples_per_insert=None,
+        record_experience=True,
         importance_sampling_exponent=0.2,
         optimizer=snt.optimizers.Adam(learning_rate=1e-3),
         checkpoint_subpath=checkpoint_dir,

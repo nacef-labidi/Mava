@@ -53,6 +53,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         fingerprint_module: FingerPrintStabalisation = None,
         evaluator: bool = False,
+        recorder=None,
     ):
         """Initialise the system executor
 
@@ -85,6 +86,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         self._agent_net_keys = agent_net_keys
         self._fingerprint_module = fingerprint_module
         self._evaluator = evaluator
+        self._recorder = recorder
 
     @tf.function
     def _policy(
@@ -118,9 +120,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         q_values = q_network(batched_observation)
 
         # Select legal action.
-        action = action_selector(
-            q_values, batched_legals, epsilon=epsilon
-        )
+        action = action_selector(q_values, batched_legals, epsilon=epsilon)
 
         return action
 
@@ -197,6 +197,9 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
                 to record during the first step. Defaults to {}.
         """
 
+        if self._recorder:
+            self._recorder.add_first(timestep)
+
         # Maybe apply fingerprinting.
         if self._fingerprint_module is not None:
             # Get useful info for fingerprinting
@@ -224,6 +227,9 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
             next_extras (Dict[str, types.NestedArray], optional): possible extra
                 information to record during the transition. Defaults to {}.
         """
+        if self._recorder:
+            self._recorder.add(actions, next_timestep)
+
         # Maybe apply fingerprinting.
         if self._fingerprint_module is not None:
             # Get useful info for fingerprinting
