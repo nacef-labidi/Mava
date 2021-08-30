@@ -12,8 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 """MADQN system executor implementation."""
 
 from typing import Any, Dict, Optional
@@ -39,6 +37,7 @@ from mava.types import OLT
 
 class MADQNFeedForwardExecutor(FeedForwardExecutor):
     """A feed-forward executor.
+
     An executor based on a feed-forward policy for each agent in the system.
     """
 
@@ -46,8 +45,8 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         self,
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
-        trainer: MADQNTrainer,
         agent_net_keys: Dict[str, str],
+        trainer: MADQNTrainer,
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         communication_module: Optional[BaseCommunicationModule] = None,
@@ -61,18 +60,18 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
                 system.
             action_selectors (Dict[str, Any]): policy action selector method, e.g.
                 epsilon greedy.
-            trainer (MADQNTrainer, optional): system trainer.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
+            agent_net_keys: specifies what network each agent uses.
                 Defaults to {}.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
+            trainer: system trainer.
+            adder: adder which sends data
                 to a replay buffer. Defaults to None.
-            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
-                client to copy weights from the trainer. Defaults to None.
-            communication_module (BaseCommunicationModule): module for enabling
+            variable_client: client to copy weights from the trainer.
+                Defaults to None.
+            communication_module: module for enabling
                 communication protocols between agents. Defaults to None.
-            fingerprint (bool, optional): whether to use fingerprint stabilisation to
+            fingerprint: whether to use fingerprint stabilisation to
                 stabilise experience replay. Defaults to False.
-            evaluator (bool, optional): whether the executor will be used for
+            evaluator: whether the executor will be used for
                 evaluation. Defaults to False.
         """
 
@@ -135,7 +134,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
-        """select an action for a single agent in the system
+        """Select an action for a single agent in the system
 
         Args:
             agent (str): agent id
@@ -178,7 +177,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         timestep: dm_env.TimeStep,
         extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-        """record first observed timestep from the environment
+        """Record first observed timestep from the environment
 
         Args:
             timestep (dm_env.TimeStep): data emitted by an environment at first step of
@@ -202,7 +201,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         next_timestep: dm_env.TimeStep,
         next_extras: Dict[str, types.NestedArray] = {},
     ) -> None:
-        """record observed timestep from the environment
+        """Record observed timestep from the environment
 
         Args:
             actions (Dict[str, types.NestedArray]): system agents' actions.
@@ -224,7 +223,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
     def select_actions(
         self, observations: Dict[str, OLT]
     ) -> Dict[str, types.NestedArray]:
-        """select the actions for all agents in the system
+        """Select the actions for all agents in the system
 
         Args:
             observations (Dict[str, OLT]): transition object containing observations,
@@ -267,7 +266,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
         return actions
 
     def update(self, wait: bool = False) -> None:
-        """update executor variables
+        """Update executor variables
 
         Args:
             wait (bool, optional): whether to stall the executor's request for new
@@ -280,6 +279,7 @@ class MADQNFeedForwardExecutor(FeedForwardExecutor):
 
 class MADQNRecurrentExecutor(RecurrentExecutor):
     """A recurrent executor.
+
     An executor based on a recurrent policy for each agent in the system
     """
 
@@ -305,11 +305,11 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
                 epsilon greedy.
             agent_net_keys: (dict, optional): specifies what network each agent uses.
                 Defaults to {}.
-            agent_net_keys (Dict[str, Any]): specifies what network each agent uses.
-            adder (Optional[adders.ParallelAdder], optional): adder which sends data
+            agent_net_keys: specifies what network each agent uses.
+            adder: adder which sends data
                 to a replay buffer. Defaults to None.
-            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
-                client to copy weights from the trainer. Defaults to None.
+            variable_client:client to copy weights from the trainer.
+                Defaults to None.
             store_recurrent_state (bool, optional): boolean to store the recurrent
                 network hidden state. Defaults to True.
             trainer (MADQNTrainer, optional): system trainer. Defaults to None.
@@ -378,7 +378,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
-        """select an action for a single agent in the system
+        """Select an action for a single agent in the system
 
         Args:
             agent (str): agent id
@@ -394,7 +394,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
     def select_actions(
         self, observations: Dict[str, OLT]
     ) -> Dict[str, types.NestedArray]:
-        """select the actions for all agents in the system
+        """Select the actions for all agents in the system
 
         Args:
             observations (Dict[str, OLT]): transition object containing observations,
@@ -434,6 +434,7 @@ class MADQNRecurrentExecutor(RecurrentExecutor):
 
 class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
     """A recurrent executor with communication.
+
     An executor based on a recurrent policy for each agent in the system using learned
     communication.
     """
@@ -464,9 +465,9 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
                 Defaults to {}.
             adder (Optional[adders.ParallelAdder], optional): adder which sends data
                 to a replay buffer. Defaults to None.
-            variable_client (Optional[tf2_variable_utils.VariableClient], optional):
-                client to copy weights from the trainer. Defaults to None.
-            store_recurrent_state (bool, optional): boolean to store the recurrent
+            variable_client: client to copy weights from the trainer.
+                Defaults to None.
+            store_recurrent_state: boolean to store the recurrent
                 network hidden state. Defaults to True.
             trainer (MADQNTrainer, optional): system trainer. Defaults to None.
             fingerprint (bool, optional): whether to use fingerprint stabilisation to
@@ -537,7 +538,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
     def select_action(
         self, agent: str, observation: types.NestedArray
     ) -> types.NestedArray:
-        """select an action for a single agent in the system
+        """Select an action for a single agent in the system
 
         Args:
             agent (str): agent id
@@ -553,7 +554,7 @@ class MADQNRecurrentCommExecutor(RecurrentCommExecutor):
     def select_actions(
         self, observations: Dict[str, OLT]
     ) -> Dict[str, types.NestedArray]:
-        """select the actions for all agents in the system
+        """Select the actions for all agents in the system
 
         Args:
             observations (Dict[str, OLT]): transition object containing observations,

@@ -12,5 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Offline RL utils."""
-from mava.utils.offline.tfrecord_dataset import tfrecord_transition_dataset
+"""Offline MADQN imports."""
+from mava.systems.tf.offline.madqn.networks import make_default_networks
+from mava.systems.tf.offline.madqn.system import OfflineMADQN
+from mava.systems.tf.offline.madqn.training import OfflineMADQNTrainer

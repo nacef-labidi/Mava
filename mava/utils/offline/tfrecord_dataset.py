@@ -39,7 +39,6 @@ def _tf_example_to_reverb_sample(tf_example: tf.train.Example) -> reverb.ReplayS
 def tfrecord_transition_dataset(
     path: str,
     environment_spec: MAEnvironmentSpec,
-    num_shards: int,
     shuffle_buffer_size: int = 100000,
 ) -> tf.data.Dataset:
     """TF dataset of SARS tuples.
@@ -53,6 +52,7 @@ def tfrecord_transition_dataset(
         shuffle_buffer_size: the size of the shuffle buffer. Larger
             results in better shuffling.
     """
+    num_shards = 1
     filenames = [os.path.join(path, str(i) + ".tfrecord") for i in range(num_shards)]
     file_ds = tf.data.Dataset.from_tensor_slices(filenames)
     file_ds = file_ds.repeat().shuffle(num_shards)
