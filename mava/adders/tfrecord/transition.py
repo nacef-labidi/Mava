@@ -85,7 +85,7 @@ class TFRecordParallelTransitionAdder(TFRecordParallelAdder):
             path = os.path.join(self._subdir, filename)
 
             # Create writter.
-            writer = tf.io.TFRecordWriter(path)
+            writer = tf.io.TFRecordWriter(path, options="GZIP")
 
             # Write the content of the buffer.
             for transition in self._buffer:
