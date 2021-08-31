@@ -237,7 +237,7 @@ class OfflineMADQN:
             "trainer", **trainer_logger_config
         )
 
-        dataset = iter(self._dataset_factory())
+        dataset = iter(self._dataset_factory().batch(self._builder._config.batch_size))
         counter = counting.Counter(counter, "trainer")
 
         return self._builder.make_trainer(
@@ -335,6 +335,6 @@ class OfflineMADQN:
             trainer = program.add_node(lp.CourierNode(self.trainer, counter))
 
         with program.group("evaluator"):
-            program.add_node(lp.CourierNode(self.evaluator, trainer, counter, trainer))
+            program.add_node(lp.CourierNode(self.evaluator, trainer, counter))
 
         return program

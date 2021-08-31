@@ -37,7 +37,7 @@ def tfrecord_transition_dataset(
     a tf Dataset backed by the ".tfrecord" files.
 
     Args:
-        path: The path to the .tfrecord files. For example "~/offlinedata/mydataset/"
+        path: The path to the .tfrecord files. For example "~/offlinedata/mydataset"
         environment_spec: the multi-agent environment specification.
             It should be the same spec as the one used when the
             data was stored to the .tfrecord files.
@@ -67,19 +67,19 @@ def tfrecord_transition_dataset(
         for agent in agent_list:
 
             # Store agent observation.
-            key = agent + "_obs"
+            key = "obs_" + agent
             schema[key] = tf.io.FixedLenFeature([], dtype=tf.string)
             # Store agent action.
-            key = agent + "_act"
+            key = "act_" + agent
             schema[key] = tf.io.FixedLenFeature([], dtype=tf.string)
             # Store agent reward.
-            key = agent + "_rew"
+            key = "rew_" + agent
             schema[key] = tf.io.FixedLenFeature([], dtype=tf.string)
             # Store agent next observation.
-            key = agent + "_nob"
+            key = "nob_" + agent
             schema[key] = tf.io.FixedLenFeature([], dtype=tf.string)
             # Store agent discount.
-            key = agent + "_dis"
+            key = "dis_" + agent
             schema[key] = tf.io.FixedLenFeature([], dtype=tf.string)
 
         # Process example
@@ -95,7 +95,7 @@ def tfrecord_transition_dataset(
         for agent in agent_list:
 
             # Store agent observation.
-            key = agent + "_obs"
+            key = "obs_" + agent
             obs = content[key]
             dtype = agent_specs[agent].observations.observation.dtype
             obs = tf.io.parse_tensor(obs, out_type=dtype)
@@ -104,17 +104,17 @@ def tfrecord_transition_dataset(
             )
             observation[agent] = observation_olt
             # Store agent action.
-            key = agent + "_act"
+            key = "act_" + agent
             act = content[key]
             dtype = agent_specs[agent].actions.dtype
             action[agent] = tf.io.parse_tensor(act, out_type=dtype)
             # Store agent reward.
-            key = agent + "_rew"
+            key = "rew_" + agent
             rew = content[key]
             dtype = agent_specs[agent].rewards.dtype
             reward[agent] = tf.io.parse_tensor(rew, out_type=dtype)
             # Store agent next observation.
-            key = agent + "_nob"
+            key = "nob_" + agent
             nob = content[key]
             dtype = agent_specs[agent].observations.observation.dtype
             nob = tf.io.parse_tensor(nob, out_type=dtype)
@@ -123,7 +123,7 @@ def tfrecord_transition_dataset(
             )
             next_observation[agent] = next_observation_olt
             # Store agent discount.
-            key = agent + "_dis"
+            key = "dis_" + agent
             dis = content[key]
             dtype = agent_specs[agent].discounts.dtype
             discount[agent] = tf.io.parse_tensor(dis, out_type=dtype)
@@ -153,7 +153,7 @@ def tfrecord_transition_dataset(
         return reverb.ReplaySample(info=info, data=data)
 
     # Process TFRecord files
-    filenames = glob.glob(path + "*.tfrecord")
+    filenames = glob.glob(path + "/*.tfrecord")
     num_shards = len(filenames)
     file_ds = tf.data.Dataset.from_tensor_slices(filenames)
     file_ds = file_ds.repeat().shuffle(num_shards)

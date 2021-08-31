@@ -171,6 +171,8 @@ class OfflineMADQNBuilder:
             checkpoint_minute_interval=self._config.checkpoint_minute_interval,
         )
 
-        trainer = DetailedTrainerStatistics(trainer)  # type:ignore
+        trainer = DetailedTrainerStatistics(
+            trainer, metrics=["q_value_loss"]
+        )  # type:ignore
 
         return trainer

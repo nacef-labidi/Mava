@@ -285,7 +285,7 @@ class OfflineMADQNTrainer(mava.Trainer):
         # Delete tape.
         train_utils.safe_del(self, "tape")
 
-    @tf.function
+    # @tf.function
     def _step(self) -> Dict:
         """Trainer forward and backward passes."""
 
