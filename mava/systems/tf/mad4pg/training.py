@@ -465,6 +465,15 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
             data.extras,
         )
 
+        # Check if env_states and obs are the same.
+        # import numpy as np
+        # for agent in self._agents:
+        #     obs_ray, obs_ff = observations[agent].observation
+        #     extra_ray, extra_ff = extras["env_states"][agent]
+        #     assert np.all(tf.math.equal(obs_ray, extra_ray))
+        #     assert np.all(tf.math.equal(obs_ff, extra_ff))
+        # print("Yes queen!")
+
         # Get initial state for the LSTM from replay and
         # extract the first state in the sequence..
         core_state = tree.map_structure(lambda s: s[:, 0, :], extras["core_states"])

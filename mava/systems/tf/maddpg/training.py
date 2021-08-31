@@ -383,6 +383,10 @@ class MADDPGBaseTrainer(mava.Trainer):
         with tf.GradientTape(persistent=True) as tape:
 
             o_tm1_trans, o_t_trans = self._transform_observations(o_tm1, o_t)
+            # TODO (dries): Try replacing the below line with policy actions
+            # and not target policy actions. Training might be faster according
+            # to a research paper.  Or do both as the critic needs target actions
+            # and the policy loss can use policy actions.
             a_t = self._target_policy_actions(o_t_trans)
             for agent in self._trainer_agent_list:
                 net_key = self._agent_net_keys[agent]
@@ -1236,6 +1240,10 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
 
             obs_trans, target_obs_trans = self._transform_observations(observations)
 
+            # TODO (dries): Try replacing the below line with policy actions
+            # and not target policy actions. Training might be faster according
+            # to a research paper. Or do both as the critic needs target actions
+            # and the policy loss can use policy actions.
             target_actions = self._target_policy_actions(
                 target_obs_trans, target_core_state
             )
@@ -1756,10 +1764,9 @@ class MADDPGStateBasedDecentralActionRecurrentTrainer(MADDPGBaseRecurrentTrainer
         # State based
         obs_trans_feed = extras["env_states"][agent]
         target_obs_trans_feed = extras["env_states"][agent]
-        action_feed = actions[agent]
-        target_action_feed = target_actions[agent]
-
-        return obs_trans_feed, target_obs_trans_feed, action_feed, target_action_feed
+        actions_feed = actions[agent]
+        target_actions_feed = target_actions[agent]
+        return obs_trans_feed, target_obs_trans_feed, actions_feed, target_actions_feed
 
     def _get_dpg_feed(
         self,
