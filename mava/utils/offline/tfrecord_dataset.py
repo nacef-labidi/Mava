@@ -15,25 +15,13 @@
 
 """Utilty to load tfrecord files into a tf dataset."""
 import functools
-import os
+import glob
+from typing import Dict, Tuple
 
 import reverb
 import tensorflow as tf
 
 from mava.specs import MAEnvironmentSpec
-
-
-def _tf_example_to_reverb_sample(tf_example: tf.train.Example) -> reverb.ReplaySample:
-    """Deserializes a TFExample into a reverb sample.
-
-    Args:
-        tf_example: A TFExample.
-
-    Returns:
-        reverb.ReplaySample: A reverb sample containing the
-            deserialized data from the TFExample.
-    """
-    pass
 
 
 def tfrecord_transition_dataset(
@@ -43,17 +31,120 @@ def tfrecord_transition_dataset(
 ) -> tf.data.Dataset:
     """TF dataset of SARS tuples.
 
+    This function will look for files with the file extension
+    ".tfrecord" in the directory given by "path" and will return
+    a tf Dataset backed by the ".tfrecord" files.
+
     Args:
-        path: The path to the .tfrecord files.
+        path: The path to the .tfrecord files. For example "~/offlinedata/mydataset/"
         environment_spec: the multi-agent environment specification.
             It should be the same spec as the one used when the
             data was stored to the .tfrecord files.
         num_shards: the number of .tfrecord files.
         shuffle_buffer_size: the size of the shuffle buffer. Larger
-            results in better shuffling.
+            size results in better shuffling.
     """
-    num_shards = 1
-    filenames = [os.path.join(path, str(i) + ".tfrecord") for i in range(num_shards)]
+    # Define function to deserialize TFExamples
+    def _tf_example_to_reverb_sample(
+        tf_example: tf.train.Example,
+    ) -> reverb.ReplaySample:
+        """Deserializes a TFExample into a reverb sample.
+
+        Args:
+            tf_example: A TFExample.
+
+        Returns:
+            reverb.ReplaySample: A reverb sample containing the
+                deserialized data from the TFExample.
+        """
+        # Agent list and specs
+        agent_list = environment_spec.get_agent_ids()
+        agent_specs = environment_spec.get_agent_specs()
+
+        # Schema
+        schema = {}
+        for agent in agent_list:
+
+            # Store agent observation.
+            key = agent + "_obs"
+            schema[key] = tf.io.FixedLenFeature([], dtype=tf.string)
+            # Store agent action.
+            key = agent + "_act"
+            schema[key] = tf.io.FixedLenFeature([], dtype=tf.string)
+            # Store agent reward.
+            key = agent + "_rew"
+            schema[key] = tf.io.FixedLenFeature([], dtype=tf.string)
+            # Store agent next observation.
+            key = agent + "_nob"
+            schema[key] = tf.io.FixedLenFeature([], dtype=tf.string)
+            # Store agent discount.
+            key = agent + "_dis"
+            schema[key] = tf.io.FixedLenFeature([], dtype=tf.string)
+
+        # Process example
+        content = tf.io.parse_single_example(tf_example, schema)
+
+        # Create mava style reverb sample.
+        observation = {}
+        action = {}
+        reward = {}
+        next_observation = {}
+        discount = {}
+        for agent in agent_list:
+
+            # Store agent observation.
+            key = agent + "_obs"
+            obs = content[key]
+            dtype = agent_specs[agent].observations.observation.dtype
+            observation[agent] = tf.io.parse_tensor(obs, out_type=dtype)
+            # Store agent action.
+            key = agent + "_act"
+            act = content[key]
+            dtype = agent_specs[agent].actions.dtype
+            action[agent] = tf.io.parse_tensor(act, out_type=dtype)
+            # Store agent reward.
+            key = agent + "_rew"
+            rew = content[key]
+            dtype = agent_specs[agent].rewards.dtype
+            reward[agent] = tf.io.parse_tensor(rew, out_type=dtype)
+            # Store agent next observation.
+            key = agent + "_nob"
+            nob = content[key]
+            dtype = agent_specs[agent].observations.observation.dtype
+            next_observation[agent] = tf.io.parse_tensor(nob, out_type=dtype)
+            # Store agent discount.
+            key = agent + "_dis"
+            dis = content[key]
+            dtype = agent_specs[agent].discounts.dtype
+            discount[agent] = tf.io.parse_tensor(dis, out_type=dtype)
+
+        # Make dummy info for reverb sample
+        info = reverb.SampleInfo(
+            key=tf.constant(0, tf.uint64),
+            probability=tf.constant(1.0, tf.float64),
+            table_size=tf.constant(0, tf.int64),
+            priority=tf.constant(1.0, tf.float64),
+        )
+
+        # Empty extras.
+        extras: Dict = {}
+        next_extras: Dict = {}
+
+        data: Tuple = (
+            observation,
+            action,
+            reward,
+            discount,
+            next_observation,
+            extras,
+            next_extras,
+        )
+
+        return reverb.ReplaySample(info=info, data=data)
+
+    # Process TFRecord files
+    filenames = glob.glob(path + "*.tfrecord")
+    num_shards = len(filenames)
     file_ds = tf.data.Dataset.from_tensor_slices(filenames)
     file_ds = file_ds.repeat().shuffle(num_shards)
     example_ds = file_ds.interleave(
@@ -62,6 +153,8 @@ def tfrecord_transition_dataset(
         block_length=5,
     )
     example_ds = example_ds.shuffle(shuffle_buffer_size)
+
+    # Return TFDataset backed by TFRecord files.
     return example_ds.map(
         _tf_example_to_reverb_sample, num_parallel_calls=tf.data.experimental.AUTOTUNE
     )
