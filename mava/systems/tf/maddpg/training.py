@@ -1071,8 +1071,6 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 observations[agent].observation
             )
 
-            obs_out = self._observation_networks[agent_key](reshaped_obs)
-
             obs_trans[agent] = train_utils.extract_dim(
                 self._observation_networks[agent_key](reshaped_obs), dims
             )
@@ -1130,9 +1128,9 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
     ) -> tf.Tensor:
         """get data to feed to the agent networks
         Args:
-            a_t (Dict[str, np.ndarray]): action at timestep t
-            dpg_a_t (np.ndarray): predicted action at timestep t
-            agent (str): agent id
+            target_actions: Target actions
+            dpg_action: New action taken by policy
+            agent: agent id
         Returns:
             tf.Tensor: agent policy network feed
         """
@@ -1312,8 +1310,8 @@ class MADDPGBaseRecurrentTrainer(mava.Trainer):
                 # gradient relationship between dpg_q_values and dpg_actions_comb.
                 dpg_actions_comb, dim = train_utils.combine_dim(dpg_actions)
 
-                # Note (dries): This seemingly useless line is important!
-                # Don't remove it. See above note.
+                # Note (dries): These seemingly useless two lines are important!
+                # Don't remove them. See above note.
                 dpg_actions = train_utils.extract_dim(dpg_actions_comb, dim)
 
                 # Get dpg actions
@@ -1576,7 +1574,7 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
 
     def _get_dpg_feed(
         self,
-        actions: Dict[str, np.ndarray],
+        target_actions: Dict[str, np.ndarray],
         dpg_actions: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
@@ -1584,8 +1582,8 @@ class MADDPGCentralisedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
-        tree.map_structure(tf.stop_gradient, actions)
-        dpg_actions_feed = copy.copy(actions)
+        tree.map_structure(tf.stop_gradient, target_actions)
+        dpg_actions_feed = copy.copy(target_actions)
         dpg_actions_feed[agent] = dpg_actions
         dpg_actions_feed = tf.squeeze(
             tf.stack([dpg_actions_feed[agent] for agent in self._agents], -1)
@@ -1672,7 +1670,7 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
 
     def _get_dpg_feed(
         self,
-        actions: Dict[str, np.ndarray],
+        target_actions: Dict[str, np.ndarray],
         dpg_actions: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
@@ -1680,8 +1678,8 @@ class MADDPGStateBasedRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         # Centralised and StateBased DPG
         # Note (dries): Copy has to be made because the input
         # variables cannot be changed.
-        tree.map_structure(tf.stop_gradient, actions)
-        dpg_actions_feed = copy.copy(actions)
+        tree.map_structure(tf.stop_gradient, target_actions)
+        dpg_actions_feed = copy.copy(target_actions)
         dpg_actions_feed[agent] = dpg_actions
         dpg_actions_feed = tf.squeeze(
             tf.stack([dpg_actions_feed[agent] for agent in self._agents], -1)
@@ -1765,7 +1763,7 @@ class MADDPGStateBasedDecentralActionRecurrentTrainer(MADDPGBaseRecurrentTrainer
 
     def _get_dpg_feed(
         self,
-        actions: Dict[str, np.ndarray],
+        target_actions: Dict[str, np.ndarray],
         dpg_actions: np.ndarray,
         agent: str,
     ) -> tf.Tensor:
