@@ -16,12 +16,13 @@
 """Utilty to load tfrecord files into a tf dataset."""
 import functools
 import glob
-from typing import Dict, Tuple
+from typing import Dict
 
 import reverb
 import tensorflow as tf
 
 from mava.specs import MAEnvironmentSpec
+from mava.types import OLT, Transition
 
 
 def tfrecord_transition_dataset(
@@ -90,13 +91,18 @@ def tfrecord_transition_dataset(
         reward = {}
         next_observation = {}
         discount = {}
+        # TODO add legals and terminal to OLT.
         for agent in agent_list:
 
             # Store agent observation.
             key = agent + "_obs"
             obs = content[key]
             dtype = agent_specs[agent].observations.observation.dtype
-            observation[agent] = tf.io.parse_tensor(obs, out_type=dtype)
+            obs = tf.io.parse_tensor(obs, out_type=dtype)
+            observation_olt: OLT = OLT(
+                observation=obs, legal_actions=None, terminal=None
+            )
+            observation[agent] = observation_olt
             # Store agent action.
             key = agent + "_act"
             act = content[key]
@@ -111,7 +117,11 @@ def tfrecord_transition_dataset(
             key = agent + "_nob"
             nob = content[key]
             dtype = agent_specs[agent].observations.observation.dtype
-            next_observation[agent] = tf.io.parse_tensor(nob, out_type=dtype)
+            nob = tf.io.parse_tensor(nob, out_type=dtype)
+            next_observation_olt: OLT = OLT(
+                observation=nob, legal_actions=None, terminal=None
+            )
+            next_observation[agent] = next_observation_olt
             # Store agent discount.
             key = agent + "_dis"
             dis = content[key]
@@ -130,14 +140,14 @@ def tfrecord_transition_dataset(
         extras: Dict = {}
         next_extras: Dict = {}
 
-        data: Tuple = (
-            observation,
-            action,
-            reward,
-            discount,
-            next_observation,
-            extras,
-            next_extras,
+        data: Transition = Transition(
+            observation=observation,
+            action=action,
+            reward=reward,
+            discount=discount,
+            next_observation=next_observation,
+            extras=extras,
+            next_extras=next_extras,
         )
 
         return reverb.ReplaySample(info=info, data=data)
