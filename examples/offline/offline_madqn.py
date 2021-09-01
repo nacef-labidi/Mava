@@ -68,13 +68,15 @@ def main(_: Any) -> None:
     # Dataset factory
     dataset_factory = functools.partial(
         tfrecord_transition_dataset,
-        path="tfrecords/2021-08-31 12:20:09.574657",
+        path="tfrecords/2021-08-31 13:43:25.432531",
         environment_spec=environment_spec,
-        shuffle_buffer_size=1000,
+        shuffle_buffer_size=100_000,
     )
 
     # Networks factory
-    network_factory = lp_utils.partial_kwargs(madqn.make_default_networks)
+    network_factory = lp_utils.partial_kwargs(
+        madqn.make_default_networks, networks_layer_sizes=(128,)
+    )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
@@ -96,7 +98,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        optimizer=snt.optimizers.Adam(learning_rate=1e-4),
+        optimizer=snt.optimizers.Adam(learning_rate=1e-2),
         checkpoint_subpath=checkpoint_dir,
     ).build()
 
