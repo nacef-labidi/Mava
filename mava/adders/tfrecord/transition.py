@@ -111,7 +111,7 @@ class TFRecordParallelTransitionAdder(TFRecordParallelAdder):
             extras: dict of optional extras
 
         """
-        self._observations = timestep.observation
+        self._observation = timestep.observation
 
     def add(
         self,
@@ -138,7 +138,7 @@ class TFRecordParallelTransitionAdder(TFRecordParallelAdder):
 
             # Store observation.
             key = "obs_" + agent
-            observation = self._observations[agent].observation
+            observation = self._observation[agent].observation
             dtype = agent_specs[agent].observations.observation.dtype
             transition[key] = self._bytes_feature(observation, dtype)
 

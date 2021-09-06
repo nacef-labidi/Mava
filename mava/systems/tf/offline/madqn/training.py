@@ -60,7 +60,7 @@ class OfflineMADQNTrainer(mava.Trainer):
         checkpoint_subpath: str = "~/mava/",
         checkpoint_minute_interval: int = 15,
     ):
-        """Initialise MADQN trainer.
+        """Initialise Offline MADQN trainer.
 
         Args:
             agents (List[str]): agent ids, e.g. "agent_0".

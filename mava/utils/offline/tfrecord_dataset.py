@@ -155,8 +155,6 @@ def tfrecord_transition_dataset(
     # Process TFRecord files
     filenames = glob.glob(path + "/*.tfrecord")
     num_shards = len(filenames)
-    print(num_shards)
-    print(filenames)
     file_ds = tf.data.Dataset.from_tensor_slices(filenames)
     file_ds = file_ds.repeat().shuffle(num_shards)
     example_ds = file_ds.interleave(
