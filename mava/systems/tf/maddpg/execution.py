@@ -239,6 +239,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
+        environment=None,
     ):
         """Initialise the system executor
         Args:
@@ -259,6 +260,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         """
 
         # Store these for later use.
+        self._environment = environment
         self._agent_specs = agent_specs
         self._executor_samples = executor_samples
         self._counts = counts
@@ -308,7 +310,9 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         agent_key = self._agent_net_keys[agent]
 
         # Compute the policy, conditioned on the observation.
-        policy, new_state = self._policy_networks[agent_key](batched_observation, prev_state=state)
+        policy, new_state = self._policy_networks[agent_key](
+            batched_observation, prev_state=state
+        )
         # TODO (dries): Make this support hybrid action spaces.
         if type(self._agent_specs[agent].actions) == BoundedArray:
             # Continuous action

@@ -305,7 +305,7 @@ def BasePBTWrapper(  # noqa
                     100, dtype=tf.int32
                 )
             if get_keys:
-                get_keys.extend(hyper_vars)
+                get_keys.extend(list(hyper_vars.keys()))
             variables.update(hyper_vars)
 
         def create_custom_executor_variables(
@@ -327,7 +327,7 @@ def BasePBTWrapper(  # noqa
                     0, dtype=tf.float32
                 )
             if get_keys:
-                get_keys.extend(reward_vars)
+                get_keys.extend(list(reward_vars.keys()))
             variables.update(reward_vars)
 
         def variable_server_fn(

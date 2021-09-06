@@ -551,6 +551,7 @@ class MADDPGBuilder:
         policy_networks: Dict[str, snt.Module],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[MavaVariableSource] = None,
+        environment: Any = None,
     ) -> core.Executor:
         """Create an executor instance.
         Args:
@@ -577,7 +578,7 @@ class MADDPGBuilder:
         count_names = self.create_counter_variables(variables, get_keys)
 
         # Create custom executor variables
-        self.create_custom_executor_variables(variables)
+        self.create_custom_executor_variables(variables, get_keys)
 
         # Link the variables to send to the executor
         counts = {name: variables[name] for name in count_names}
@@ -608,6 +609,7 @@ class MADDPGBuilder:
             executor_samples=self._config.executor_samples,
             variable_client=variable_client,
             adder=adder,
+            environment=environment,
         )
         return executor
 

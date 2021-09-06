@@ -86,6 +86,7 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
         adder: Optional[adders.ParallelAdder] = None,
         counts: Optional[Dict[str, Any]] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+        environment=None,
     ):
         """Initialise the system executor
 
@@ -111,4 +112,5 @@ class MAD4PGRecurrentExecutor(MADDPGRecurrentExecutor):
             agent_net_keys=agent_net_keys,
             executor_samples=executor_samples,
             net_to_ints=net_to_ints,
+            environment=environment,
         )

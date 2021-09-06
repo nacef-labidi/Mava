@@ -453,6 +453,10 @@ class MADDPG:
         # Create the system
         behaviour_policy_networks, networks = self.create_system()
 
+        # TODO (Arnu): figure out why factory function are giving type errors
+        # Create the environment.
+        environment = self._environment_factory(evaluation=False)  # type: ignore
+
         # Create the executor.
         executor = self._builder.make_executor(
             executor_id=executor_id,
@@ -460,11 +464,8 @@ class MADDPG:
             policy_networks=behaviour_policy_networks,
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
+            environment=environment,
         )
-
-        # TODO (Arnu): figure out why factory function are giving type errors
-        # Create the environment.
-        environment = self._environment_factory(evaluation=False)  # type: ignore
 
         # Create executor logger
         executor_logger_config = {}
@@ -504,16 +505,17 @@ class MADDPG:
         # Create the system
         behaviour_policy_networks, networks = self.create_system()
 
+        # Make the environment.
+        environment = self._environment_factory(evaluation=True)  # type: ignore
+
         # Create the agent.
         executor = self._builder.make_executor(
             executor_id="evaluator",
             networks=networks,
             policy_networks=behaviour_policy_networks,
             variable_source=variable_source,
+            environment=environment,
         )
-
-        # Make the environment.
-        environment = self._environment_factory(evaluation=True)  # type: ignore
 
         # Create logger and counter.
         evaluator_logger_config = {}
