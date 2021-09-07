@@ -98,7 +98,7 @@ class DRVariableSource(MavaVariableSource):
                 # Set the moving average to 0.9 to allow for adjusting period
                 # not to update game_diff.
                 self.variables["moving_avg_rewards"].assign(
-                    self._diff_inc_score_threshold * 0.9
+                    self._diff_inc_score_threshold * 0.0
                 )
                 # Only increase the environmental difficulty.
                 self.variables["game_diff"].assign(
