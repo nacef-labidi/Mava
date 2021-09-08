@@ -52,7 +52,7 @@ class DRVariableSource(MavaVariableSource):
             None
         """
         # TODO: Fix these values
-        self._diff_inc_score_threshold = 0.1
+        self._diff_inc_score_threshold = 0.5
         self._checkpoint_interval = 10 * 60
 
         self._last_checkpoint_time = time.time()
@@ -61,6 +61,9 @@ class DRVariableSource(MavaVariableSource):
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
         )
+
+        # After load delet ethis
+        # self.variables["game_diff"].assign(0.5)
 
     def run(self) -> None:
         """Run the variable source. This function allows for
