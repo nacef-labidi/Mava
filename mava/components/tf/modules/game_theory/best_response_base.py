@@ -155,7 +155,6 @@ def BestResponseWrapper(  # noqa
             """Sample new keys for the network ints."""
             agent_list = list(self._agent_net_keys.keys())  # type: ignore
             agent_slots = sort_str_num(agent_list)
-
             assert len(agent_slots) % 2 == 0
             half_ind = int(len(agent_slots) / 2)
 
