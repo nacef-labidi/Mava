@@ -204,6 +204,7 @@ class RecurrentExecutor(core.Executor):
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
         environment: Optional[dm_env.Environment] = None,
+        executor_id: Optional[str] = None,
     ):
         """Initialise the system executor
 

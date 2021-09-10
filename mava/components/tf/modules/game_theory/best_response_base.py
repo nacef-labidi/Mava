@@ -152,29 +152,41 @@ def BestResponseWrapper(  # noqa
 
         # BR executor
         def sample_new_keys(self) -> None:
-            """Sample new keys for the network ints."""
-            agent_list = list(self._agent_net_keys.keys())  # type: ignore
-            agent_slots = sort_str_num(agent_list)
-            assert len(agent_slots) % 2 == 0
-            half_ind = int(len(agent_slots) / 2)
 
-            # Sample random networks for half of the agents
-            self._network_int_keys_extras, self._agent_net_keys = sample_new_agent_keys(
-                agent_slots[:half_ind],
-                self._executor_samples,
-                self._net_to_ints,
-            )
+            if self._executor_id == "evaluator":
+                # Set all the agents use the best response network
+                net_key = "br_network"
+                agent_list = list(self._agent_net_keys.keys())  # type: ignore
+                agent_slots = sort_str_num(agent_list)
+                self._agent_net_keys = {}
+                self._agent_net_keys.update({agent: net_key for agent in agent_slots})
+            else:
+                """Sample new keys for the network ints."""
+                agent_list = list(self._agent_net_keys.keys())  # type: ignore
+                agent_slots = sort_str_num(agent_list)
+                assert len(agent_slots) % 2 == 0
+                half_ind = int(len(agent_slots) / 2)
 
-            # Set the other half of the agents to use the best response network
-            agent_slots = copy.copy(agent_slots[half_ind:])
-            net_key = "br_network"
-            self._agent_net_keys.update({agent: net_key for agent in agent_slots})
-            self._network_int_keys_extras.update(
-                {
-                    agent: np.array(self._net_to_ints[net_key], dtype=np.int32)
-                    for agent in agent_slots
-                }
-            )
+                # Sample random networks for half of the agents
+                (
+                    self._network_int_keys_extras,
+                    self._agent_net_keys,
+                ) = sample_new_agent_keys(
+                    agent_slots[:half_ind],
+                    self._executor_samples,
+                    self._net_to_ints,
+                )
+
+                # Set the other half of the agents to use the best response network
+                agent_slots = copy.copy(agent_slots[half_ind:])
+                net_key = "br_network"
+                self._agent_net_keys.update({agent: net_key for agent in agent_slots})
+                self._network_int_keys_extras.update(
+                    {
+                        agent: np.array(self._net_to_ints[net_key], dtype=np.int32)
+                        for agent in agent_slots
+                    }
+                )
 
     system._builder._executor_fn = BRExecutor
 

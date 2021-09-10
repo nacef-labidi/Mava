@@ -240,6 +240,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         store_recurrent_state: bool = True,
         environment=None,
+        executor_id=None,
     ):
         """Initialise the system executor
         Args:
@@ -261,6 +262,7 @@ class MADDPGRecurrentExecutor(executors.RecurrentExecutor):
 
         # Store these for later use.
         self._environment = environment
+        self._executor_id = executor_id
         self._agent_specs = agent_specs
         self._executor_samples = executor_samples
         self._counts = counts

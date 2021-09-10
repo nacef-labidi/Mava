@@ -610,6 +610,7 @@ class MADDPGBuilder:
             variable_client=variable_client,
             adder=adder,
             environment=environment,
+            executor_id=executor_id,
         )
         return executor
 
