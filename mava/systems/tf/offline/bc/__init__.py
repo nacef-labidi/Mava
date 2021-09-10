@@ -12,13 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Behaviour Cloning imports.
 
-
-"""MARL system exploration modules."""
-
-from mava.components.tf.modules.exploration.exploration_scheduling import (
-    ExponentialExplorationScheduler,
-    LinearExplorationScheduler,
-    ConstantExplorationScheduler,
-    BaseExplorationScheduler
-)
+We implement behaviour cloning like in Acme.
+"""
+from mava.systems.tf.offline.bc.networks import make_default_networks
+from mava.systems.tf.offline.bc.system import BC
+from mava.systems.tf.offline.bc.training import BCTrainer

@@ -12,13 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Batch constrained Q-learning imports.
 
-
-"""MARL system exploration modules."""
-
-from mava.components.tf.modules.exploration.exploration_scheduling import (
-    ExponentialExplorationScheduler,
-    LinearExplorationScheduler,
-    ConstantExplorationScheduler,
-    BaseExplorationScheduler
-)
+We implement batch constrained q-learning like in Acme.
+"""
+from mava.systems.tf.offline.bcq.networks import make_default_networks
+from mava.systems.tf.offline.bcq.system import BCQ
+from mava.systems.tf.offline.bcq.training import BCQTrainer

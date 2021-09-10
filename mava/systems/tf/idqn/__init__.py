@@ -12,13 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
-"""MARL system exploration modules."""
-
-from mava.components.tf.modules.exploration.exploration_scheduling import (
-    ExponentialExplorationScheduler,
-    LinearExplorationScheduler,
-    ConstantExplorationScheduler,
-    BaseExplorationScheduler
-)
+"""Independent DQN."""
+from mava.systems.tf.idqn.networks import make_default_networks
+from mava.systems.tf.idqn.system import IDQN
+from mava.systems.tf.idqn.training import IDQNTrainer

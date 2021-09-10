@@ -50,7 +50,7 @@ def main(_: Any) -> None:
         "rail_generator": sparse_rail_generator(**rail_gen_cfg),
         "schedule_generator": sparse_schedule_generator(),
         "obs_builder_object": TreeObsForRailEnv(
-            max_depth=2, predictor=ShortestPathPredictorForRailEnv(max_depth=30)
+            max_depth=2, predictor=ShortestPathPredictorForRailEnv()
         ),
     }
 
@@ -68,9 +68,9 @@ def main(_: Any) -> None:
     # Dataset factory
     dataset_factory = functools.partial(
         tfrecord_transition_dataset,
-        path="tfrecords/2021-08-31 13:43:25.432531",
+        path="tfrecords/2021-09-07 09:07:58.744968",
         environment_spec=environment_spec,
-        shuffle_buffer_size=100_000,
+        shuffle_buffer_size=200_000,
     )
 
     # Networks factory
@@ -98,8 +98,11 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        optimizer=snt.optimizers.Adam(learning_rate=1e-2),
+        optimizer=snt.optimizers.Adam(learning_rate=1e-3),
         checkpoint_subpath=checkpoint_dir,
+        batch_size=256,
+        # target_update_period=8000,
+        executor_variable_update_period=100,
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.

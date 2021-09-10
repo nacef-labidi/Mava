@@ -223,6 +223,11 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
         self._running_statistics.update({"episode_length": episode_steps})
         self._running_statistics.update(counts)
 
+        # # Log extra executor stats, e.g. epsilon for madqn
+        extra_executor_stats = getattr(self._executor, "get_stats", None)
+        if extra_executor_stats:
+            self._running_statistics.update(self._executor.get_stats())
+
 
 class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
     """A MARL environment loop.

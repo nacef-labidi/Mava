@@ -1,19 +1,3 @@
-# python3
-# Copyright 2021 InstaDeep Ltd. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-
 import functools
 from datetime import datetime
 from typing import Any, Dict
@@ -26,14 +10,12 @@ from flatland.envs.predictions import ShortestPathPredictorForRailEnv
 from flatland.envs.rail_generators import sparse_rail_generator
 from flatland.envs.schedule_generators import sparse_schedule_generator
 
-from mava.adders.tfrecord import TFRecordParallelTransitionAdder
-from mava.components.tf.modules.exploration.exploration_scheduling import (
-    LinearExplorationScheduler,
-)
-from mava.systems.tf import madqn
+from mava.specs import MAEnvironmentSpec
+from mava.systems.tf.offline import bcq
 from mava.utils import lp_utils
 from mava.utils.environments.flatland_utils import flatland_env_factory
 from mava.utils.loggers import logger_utils
+from mava.utils.offline import tfrecord_transition_dataset
 
 FLAGS = flags.FLAGS
 
@@ -45,27 +27,6 @@ flags.DEFINE_string(
 flags.DEFINE_string("base_dir", "logs/", "Base dir to store experiments.")
 
 
-# flatland environment config
-rail_gen_cfg: Dict = {
-    "max_num_cities": 2,
-    "max_rails_between_cities": 2,
-    "max_rails_in_city": 3,
-    "grid_mode": False,
-    "seed": 42,
-}
-
-flatland_env_config: Dict = {
-    "number_of_agents": 2,
-    "width": 25,
-    "height": 25,
-    "rail_generator": sparse_rail_generator(**rail_gen_cfg),
-    "schedule_generator": sparse_schedule_generator(),
-    "obs_builder_object": TreeObsForRailEnv(
-        max_depth=2, predictor=ShortestPathPredictorForRailEnv()
-    ),
-}
-
-
 def main(_: Any) -> None:
     """Main function for the example.
 
@@ -73,14 +34,48 @@ def main(_: Any) -> None:
         _ (Any): args.
     """
 
-    # Environment.
+    # Flatland environment config
+    rail_gen_cfg: Dict = {
+        "max_num_cities": 2,
+        "max_rails_between_cities": 2,
+        "max_rails_in_city": 3,
+        "grid_mode": False,
+        "seed": 42,
+    }
+
+    flatland_env_config: Dict = {
+        "number_of_agents": 2,
+        "width": 25,
+        "height": 25,
+        "rail_generator": sparse_rail_generator(**rail_gen_cfg),
+        "schedule_generator": sparse_schedule_generator(),
+        "obs_builder_object": TreeObsForRailEnv(
+            max_depth=2, predictor=ShortestPathPredictorForRailEnv()
+        ),
+    }
+
+    # Environment factory
     environment_factory = functools.partial(
         flatland_env_factory, env_config=flatland_env_config, include_agent_info=False
     )
 
-    # Networks.
+    # Make environment spec for dataset factory
+    environment = flatland_env_factory(
+        env_config=flatland_env_config, include_agent_info=False
+    )
+    environment_spec = MAEnvironmentSpec(environment=environment)
+
+    # Dataset factory
+    dataset_factory = functools.partial(
+        tfrecord_transition_dataset,
+        path="tfrecords/bcq_dataset",
+        environment_spec=environment_spec,
+        shuffle_buffer_size=20_000,
+    )
+
+    # Networks factory
     network_factory = lp_utils.partial_kwargs(
-        madqn.make_default_networks, policy_networks_layer_sizes=(128,)
+        bcq.make_default_networks, network_layer_sizes=(128,)
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -97,21 +92,17 @@ def main(_: Any) -> None:
         time_delta=log_every,
     )
 
-    # distributed program
-    program = madqn.MADQN(
+    # Build distributed program
+    program = bcq.BCQ(
+        dataset_factory=dataset_factory,
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=1,
-        executor_variable_update_period=100,
-        exploration_scheduler_fn=LinearExplorationScheduler,
-        epsilon_min=0.05,
-        epsilon_decay=1e-4,
-        # importance_sampling_exponent=0.2,
-        optimizer=snt.optimizers.Adam(learning_rate=1e-3),
-        tfrecord_adder_factory=TFRecordParallelTransitionAdder,
-        tfrecord_adder_kwargs={"transitions_per_file": 150_000},
+        learning_rate=1e-3,
+        threshold=0.3,
         checkpoint_subpath=checkpoint_dir,
+        batch_size=256,
+        executor_variable_update_period=100,
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.

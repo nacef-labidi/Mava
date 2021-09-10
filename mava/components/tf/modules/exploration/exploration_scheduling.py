@@ -42,6 +42,26 @@ class BaseExplorationScheduler:
     def reset_epsilon(self) -> None:
         self._epsilon = self._epsilon_start
 
+class ConstantExplorationScheduler(BaseExplorationScheduler):
+    def __init__(
+        self,
+        epsilon_start: float = 0.0,
+        epsilon_min: float = 0.0,
+        epsilon_decay: float = 0.0,
+    ):
+        """Keep epsilon fixed at epsilon_start. 
+        
+        For no exploration set epsilon_start to 0.
+        """
+        super(ConstantExplorationScheduler, self).__init__(
+            epsilon_start,
+            epsilon_min,
+            epsilon_decay,
+        )
+
+    def decrement_epsilon(self) -> None:
+        pass
+
 
 class LinearExplorationScheduler(BaseExplorationScheduler):
     def __init__(
