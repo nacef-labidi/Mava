@@ -43,6 +43,7 @@ from mava.systems.tf.maddpg.execution import (
     sample_new_agent_keys,
 )
 from mava.systems.tf.variable_sources import VariableSource as MavaVariableSource
+from mava.utils import enums
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.utils.sort_utils import sort_str_num
 from mava.wrappers import DetailedPerAgentStatistics
@@ -65,8 +66,12 @@ class MADDPG:
         ] = training.MADDPGDecentralisedTrainer,
         executor_fn: Type[core.Executor] = MADDPGFeedForwardExecutor,
         num_executors: int = 1,
-        trainer_networks: Dict[str, List] = {},
-        executor_samples: List = [],
+        trainer_networks: Union[
+            Dict[str, List], enums.Trainer
+        ] = enums.Trainer.single_trainer,
+        network_sampling_setup: Union[
+            List, enums.NetworkSampler
+        ] = enums.NetworkSampler.fixed_agent_networks,
         shared_weights: bool = True,
         environment_spec: mava_specs.MAEnvironmentSpec = None,
         discount: float = 0.99,
@@ -89,6 +94,7 @@ class MADDPG:
         max_gradient_norm: float = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
+        checkpoint_minute_interval: int = 5,
         logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
@@ -98,88 +104,70 @@ class MADDPG:
     ):
         """Initialise the system
         Args:
-            environment_factory (Callable[[bool], dm_env.Environment]): function to
+            environment_factory: function to
                 instantiate an environment.
-            network_factory (Callable[[acme_specs.BoundedArray],
-                Dict[str, snt.Module]]): function to instantiate system networks.
-            logger_factory (Callable[[str], MavaLogger], optional): function to
-                instantiate a system logger. Defaults to None.
-            architecture (Type[ DecentralisedQValueActorCritic ], optional):
-                system architecture, e.g. decentralised or centralised. Defaults to
-                DecentralisedQValueActorCritic.
-            trainer_fn (Union[ Type[training.MADDPGBaseTrainer],
-                Type[training.MADDPGBaseRecurrentTrainer], ], optional): training type
+            network_factory: function to instantiate system networks.
+            logger_factory: function to
+                instantiate a system logger.
+            architecture:
+                system architecture, e.g. decentralised or centralised.
+            trainer_fn: training type
                 associated with executor and architecture, e.g. centralised training.
-                Defaults to training.MADDPGDecentralisedTrainer.
-            executor_fn (Type[core.Executor], optional): executor type, e.g.
-                feedforward or recurrent. Defaults to MADDPGFeedForwardExecutor.
-            num_executors (int, optional): number of executor processes to run in
-                parallel. Defaults to 1.
-            num_caches (int, optional): number of trainer node caches. Defaults to 0.
-            environment_spec (mava_specs.MAEnvironmentSpec, optional): description of
+            executor_fn: executor type, e.g.
+                feedforward or recurrent.
+            num_executors: number of executor processes to run in
+                parallel..
+            environment_spec: description of
                 the action, observation spaces etc. for each agent in the system.
-                Defaults to None.
-            trainer_networks (Dict[str, List[snt.Module]], optional): networks each
-                trainer trains on. Defaults to {}.
-            executor_samples (List, optional): List of networks that are randomly
+            trainer_networks: networks each
+                trainer trains on.
+            network_sampling_setup: List of networks that are randomly
                 sampled from by the executors at the start of an environment run.
-                Defaults to [].
-            shared_weights (bool, optional): whether agents should share weights or not.
-                When executor_samples are provided the value of shared_weights is
-                ignored. Defaults to True.
-            discount (float, optional): discount factor to use for TD updates. Defaults
-                to 0.99.
-            batch_size (int, optional): sample batch size for updates. Defaults to 256.
-            prefetch_size (int, optional): size to prefetch from replay. Defaults to 4.
-            target_averaging (bool, optional): whether to use polyak averaging for
-                target network updates. Defaults to False.
-            target_update_period (int, optional): number of steps before target
-                networks are updated. Defaults to 100.
-            target_update_rate (Optional[float], optional): update rate when using
-                averaging. Defaults toNone.
-            executor_variable_update_period (int, optional): number of steps before
-                updating executor variables from the variable source. Defaults to 1000.
-            min_replay_size (int, optional): minimum replay size before updating.
-                Defaults to 1000.
-            max_replay_size (int, optional): maximum replay size. Defaults to 1000000.
-            samples_per_insert (Optional[float], optional): number of samples to take
-                from replay for every insert that is made. Defaults to 32.0.
-            policy_optimizer (Dict[str, snt.Optimizer],
-                optional): optimizer(s) for updating policy networks. Defaults to
-                snt.optimizers.Adam(learning_rate=1e-4).
-            critic_optimizer (Dict[str, snt.Optimizer],
-                optional): optimizer for updating critic
-                networks. Defaults to snt.optimizers.Adam(learning_rate=1e-4).
-            n_step (int, optional): number of steps to include prior to boostrapping.
-                Defaults to 5.
-            sequence_length (int, optional): recurrent sequence rollout length. Defaults
-                to 20.
-            period (int, optional): Consecutive starting points for overlapping
-                rollouts across a sequence. Defaults to 20.
-            bootstrap_n (int, optional): Used to determine the spacing between
+            shared_weights: whether agents should share weights or not.
+                When network_sampling_setup are provided the value of shared_weights is
+                ignored.
+            discount: discount factor to use for TD updates.
+            batch_size: sample batch size for updates.
+            prefetch_size: size to prefetch from replay.
+            target_averaging: whether to use polyak averaging for
+                target network updates.
+            target_update_period: number of steps before target
+                networks are updated.
+            target_update_rate: update rate when using
+                averaging.
+            executor_variable_update_period: number of steps before
+                updating executor variables from the variable source.
+            min_replay_size: minimum replay size before updating.
+            max_replay_size: maximum replay size.
+            samples_per_insert: number of samples to take
+                from replay for every insert that is made.
+            policy_optimizer: optimizer(s) for updating policy networks.
+            critic_optimizer: optimizer for updating critic
+                networks.
+            n_step: number of steps to include prior to boostrapping.
+            sequence_length: recurrent sequence rollout length.
+            period: Consecutive starting points for overlapping
+                rollouts across a sequence.
+            bootstrap_n: Used to determine the spacing between
                 q_value/value estimation for bootstrapping. Should be less
                 than sequence_length.
-            sigma (float, optional): Gaussian sigma parameter. Defaults to 0.3.
-            max_gradient_norm (float, optional): maximum allowed norm for gradients
-                before clipping is applied. Defaults to None.
-            max_executor_steps (int, optional): maximum number of steps and executor
-                can in an episode. Defaults to None.
-            checkpoint (bool, optional): whether to checkpoint models. Defaults to
-                False.
-            checkpoint_subpath (str, optional): subdirectory specifying where to store
-                checkpoints. Defaults to "~/mava/".
-            logger_config (Dict, optional): additional configuration settings for the
-                logger factory. Defaults to {}.
-            train_loop_fn (Callable, optional): function to instantiate a train loop.
-                Defaults to ParallelEnvironmentLoop.
-            eval_loop_fn (Callable, optional): function to instantiate an evaluation
-                loop. Defaults to ParallelEnvironmentLoop.
-            train_loop_fn_kwargs (Dict, optional): possible keyword arguments to send
-                to the training loop. Defaults to {}.
-            eval_loop_fn_kwargs (Dict, optional): possible keyword arguments to send to
-                the evaluation loop. Defaults to {}.
-            connection_spec (Callable[[Dict[str, List[str]]], Dict[str, List[str]]],
-                optional): network topology specification for networked system
+            sigma: Gaussian sigma parameter.
+            max_gradient_norm: maximum allowed norm for gradients
+                before clipping is applied.
+            checkpoint: whether to checkpoint models.
+            checkpoint_minute_interval: The number of minutes to wait between
+                checkpoints.
+            checkpoint_subpath: subdirectory specifying where to store
+                checkpoints.
+            logger_config: additional configuration settings for the
+                logger factory.
+            train_loop_fn: function to instantiate a train loop.
+            eval_loop_fn: function to instantiate an evaluation
+                loop.
+            train_loop_fn_kwargs: possible keyword arguments to send
+                to the training loop.
+            eval_loop_fn_kwargs: possible keyword arguments to send to
+            the evaluation loop.
         """
 
         if not environment_spec:
@@ -196,46 +184,69 @@ class MADDPG:
                 time_delta=10,
             )
 
-        # Setup agent networks and executor sampler
+        # Setup agent networks and network sampling setup
         agents = sort_str_num(environment_spec.get_agent_ids())
-        self._executor_samples = executor_samples
-        if not executor_samples:
-            # if no executor samples provided, use shared_weights to determine setup
-            self._agent_net_keys = {
-                agent: agent.split("_")[0] if shared_weights else agent
-                for agent in agents
-            }
-            self._executor_samples = [
-                [
-                    self._agent_net_keys[key]
-                    for key in sort_str_num(self._agent_net_keys.keys())
+        self._network_sampling_setup = network_sampling_setup
+
+        if type(network_sampling_setup) is not list:
+            if network_sampling_setup == enums.NetworkSampler.fixed_agent_networks:
+                # if no network_sampling_setup is fixed, use shared_weights to
+                # determine setup
+                self._agent_net_keys = {
+                    agent: "network_0" if shared_weights else f"network_{i}"
+                    for i, agent in enumerate(agents)
+                }
+                self._network_sampling_setup = [
+                    [
+                        self._agent_net_keys[key]
+                        for key in sort_str_num(self._agent_net_keys.keys())
+                    ]
                 ]
-            ]
+            elif network_sampling_setup == enums.NetworkSampler.random_agent_networks:
+                """Create N network policies, where N is the number of agents. Randomly
+                select policies from this sets for each agent at the start of a
+                episode. This sampling is done with replacement so the same policy
+                can be selected for more than one agent for a given episode."""
+                if shared_weights:
+                    raise ValueError(
+                        "Shared weights cannot be used with random policy per agent"
+                    )
+                self._agent_net_keys = {
+                    agents[i]: f"network_{i}" for i in range(len(agents))
+                }
+                self._network_sampling_setup = [
+                    [
+                        [self._agent_net_keys[key]]
+                        for key in sort_str_num(self._agent_net_keys.keys())
+                    ]
+                ]
+            else:
+                raise ValueError(
+                    "network_sampling_setup must be a dict or fixed_agent_networks"
+                )
+
         else:
-            # if executor samples provided, use executor_samples to determine setup
+            # if a dictionary is provided, use network_sampling_setup to determine setup
             _, self._agent_net_keys = sample_new_agent_keys(
                 agents,
-                self._executor_samples,
+                self._network_sampling_setup,  # type: ignore
             )
 
         # Check that the environment and agent_net_keys has the same amount of agents
-        # TODO (dries): Try using self._executor_samples = [['agent]].
-        # This might accelerate training as experience gets batched instead of training
-        # sequentially.
-        sample_length = len(self._executor_samples[0])
+        sample_length = len(self._network_sampling_setup[0])  # type: ignore
         assert len(environment_spec.get_agent_ids()) == len(self._agent_net_keys.keys())
 
         # Check if the samples are of the same length and that they perfectly fit
         # into the total number of agents
         assert len(self._agent_net_keys.keys()) % sample_length == 0
-        for i in range(1, len(self._executor_samples)):
-            assert len(self._executor_samples[i]) == sample_length
+        for i in range(1, len(self._network_sampling_setup)):  # type: ignore
+            assert len(self._network_sampling_setup[i]) == sample_length  # type: ignore
 
         # Get all the unique agent network keys
         all_samples = []
-        for sample in self._executor_samples:
+        for sample in self._network_sampling_setup:  # type: ignore
             all_samples.extend(sample)
-        unique_net_keys = sort_str_num(list(set(all_samples)))
+        unique_net_keys = list(sort_str_num(list(set(all_samples))))
 
         # Create the optimizers if not specified
         if type(policy_optimizer) is not dict:
@@ -253,13 +264,21 @@ class MADDPG:
             }
 
         # Create mapping from ints to networks
-        net_to_ints = {net_key: i for i, net_key in enumerate(unique_net_keys)}
+        net_keys_to_ids = {net_key: i for i, net_key in enumerate(unique_net_keys)}
 
         # Setup trainer_networks
-        if not trainer_networks:
-            self._trainer_networks = {"trainer_0": list(unique_net_keys)}
-        else:
-            self._trainer_networks = trainer_networks
+        if type(trainer_networks) is not dict:
+            if trainer_networks == enums.Trainer.single_trainer:
+                self._trainer_networks = {"trainer_0": unique_net_keys}
+            elif trainer_networks == enums.Trainer.one_trainer_per_network:
+                self._trainer_networks = {
+                    f"trainer_{i}": [unique_net_keys[i]]
+                    for i in range(len(unique_net_keys))
+                }
+            else:
+                raise ValueError(
+                    "trainer_networks does not support this enums setting."
+                )
 
         # Get all the unique trainer network keys
         all_trainer_net_keys = []
@@ -279,7 +298,7 @@ class MADDPG:
         for t_id in range(len(self._trainer_networks.keys())):
             most_matches = 0
             trainer_nets = self._trainer_networks[f"trainer_{t_id}"]
-            for sample in self._executor_samples:
+            for sample in self._network_sampling_setup:  # type: ignore
                 matches = 0
                 for entry in sample:
                     if entry in trainer_nets:
@@ -326,8 +345,8 @@ class MADDPG:
                 trainer_networks=self._trainer_networks,
                 table_network_config=table_network_config,
                 num_executors=num_executors,
-                executor_samples=self._executor_samples,
-                net_to_ints=net_to_ints,
+                network_sampling_setup=self._network_sampling_setup,  # type: ignore
+                net_keys_to_ids=net_keys_to_ids,
                 unique_net_keys=unique_net_keys,
                 discount=discount,
                 batch_size=batch_size,
@@ -349,6 +368,7 @@ class MADDPG:
                 policy_optimizer=policy_optimizer,  # type: ignore
                 critic_optimizer=critic_optimizer,  # type: ignore
                 checkpoint_subpath=checkpoint_subpath,
+                checkpoint_minute_interval=checkpoint_minute_interval,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -358,7 +378,7 @@ class MADDPG:
     def _get_extra_specs(self) -> Any:
         """helper to establish specs for extra information
         Returns:
-            Dict[str, Any]: dictionary containing extra specs
+            dictionary containing extra specs
         """
 
         agents = self._environment_spec.get_agent_ids()
@@ -380,9 +400,9 @@ class MADDPG:
     def replay(self) -> Any:
         """Step counter
         Args:
-            checkpoint (bool): whether to checkpoint the counter.
+            checkpoint: whether to checkpoint the counter.
         Returns:
-            Any: step counter object.
+            step counter object.
         """
         return self._builder.make_replay_tables(self._environment_spec)
 
@@ -442,11 +462,10 @@ class MADDPG:
     ) -> mava.ParallelEnvironmentLoop:
         """System executor
         Args:
-            executor_id (str): id to identify the executor process for logging purposes.
-            replay (reverb.Client): replay data table to push data to.
-            variable_source (acme.VariableSource): variable server for updating
+            executor_id: id to identify the executor process for logging purposes.
+            replay: replay data table to push data to.
+            variable_source: variable server for updating
                 network variables.
-            counter (counting.Counter): step counter object.
         Returns:
             mava.ParallelEnvironmentLoop: environment-executor loop instance.
         """
@@ -493,12 +512,11 @@ class MADDPG:
     ) -> Any:
         """System evaluator (an executor process not connected to a dataset)
         Args:
-            variable_source (acme.VariableSource): variable server for updating
+            variable_source: variable server for updating
                 network variables.
-            counter (counting.Counter): step counter object.
-            logger (loggers.Logger, optional): logger object. Defaults to None.
+            logger: logger object.
         Returns:
-            Any: environment-executor evaluation loop instance for evaluating the
+            environment-executor evaluation loop instance for evaluating the
                 performance of a system.
         """
 
@@ -546,10 +564,12 @@ class MADDPG:
     ) -> mava.core.Trainer:
         """System trainer
         Args:
-            replay (reverb.Client): replay data table to pull data from.
-            counter (counting.Counter): step counter object.
+            trainer_id: Id of the trainer being created.
+            replay: replay data table to pull data from.
+            variable_source: variable server for updating
+                network variables.
         Returns:
-            mava.core.Trainer: system trainer.
+            system trainer.
         """
 
         # create logger
@@ -579,9 +599,9 @@ class MADDPG:
     def build(self, name: str = "maddpg") -> Any:
         """Build the distributed system as a graph program.
         Args:
-            name (str, optional): system name. Defaults to "maddpg".
+            name: system name.
         Returns:
-            Any: graph program for distributed system training.
+            graph program for distributed system training.
         """
         program = lp.Program(name=name)
 

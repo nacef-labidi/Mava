@@ -21,7 +21,6 @@ from typing import Any
 import launchpad as lp
 import sonnet as snt
 from absl import app, flags
-from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava.systems.tf import mad4pg
 from mava.utils import lp_utils
@@ -57,7 +56,11 @@ def main(_: Any) -> None:
     )
 
     # Networks.
-    network_factory = lp_utils.partial_kwargs(mad4pg.make_default_networks)
+    network_factory = lp_utils.partial_kwargs(
+        mad4pg.make_default_networks,
+        vmin=-10,
+        vmax=50,
+    )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir.
     checkpoint_dir = f"{FLAGS.base_dir}/{FLAGS.mava_id}"
@@ -86,13 +89,9 @@ def main(_: Any) -> None:
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.
-    gpu_id = -1
-    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
-    local_resources = {
-        "trainer": [],
-        "evaluator": PythonProcess(env=env_vars),
-        "executor": PythonProcess(env=env_vars),
-    }
+    local_resources = lp_utils.to_device(
+        program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
+    )
 
     # Launch.
     lp.launch(

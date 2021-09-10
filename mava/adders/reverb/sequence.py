@@ -27,7 +27,7 @@ import reverb
 import tensorflow as tf
 import tree
 from acme import specs
-from acme.adders.reverb import utils
+from acme.adders.reverb import utils as acme_utils
 from acme.adders.reverb.sequence import SequenceAdder
 from acme.types import NestedSpec
 
@@ -50,7 +50,7 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         client: reverb.Client,
         sequence_length: int,
         period: int,
-        int_to_nets: List[str] = None,
+        net_ids_to_keys: List[str] = None,
         table_network_config: Dict[str, List] = None,
         *,
         delta_encoded: bool = False,
@@ -67,7 +67,7 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
           period: The period with which we add sequences. If less than
             sequence_length, overlapping sequences are added. If equal to
             sequence_length, sequences are exactly non-overlapping.
-          int_to_nets: A list of network names to convert from integers to
+          net_ids_to_keys: A list of network names to convert from integers to
             strings.
           table_network_config: A dictionary mapping table names to lists of
             network names.
@@ -103,13 +103,11 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         )
 
         self._period = period
-        self._int_to_nets = int_to_nets
+        self._net_ids_to_keys = net_ids_to_keys
         self._sequence_length = sequence_length
         self._end_of_episode_behavior = end_of_episode_behavior
         self._table_network_config = table_network_config
 
-    # TODO(Kale-ab) Consider deprecating in future versions and using acme
-    # version of this function.
     def _maybe_create_item(
         self, sequence_length: int, *, end_of_episode: bool = False, force: bool = False
     ) -> None:
@@ -135,7 +133,9 @@ class ParallelSequenceAdder(SequenceAdder, ReverbParallelAdder):
         trajectory = base.Trajectory(**tree.map_structure(get_traj, history))
 
         # Compute priorities for the buffer.
-        table_priorities = utils.calculate_priorities(self._priority_fns, trajectory)
+        table_priorities = acme_utils.calculate_priorities(
+            self._priority_fns, trajectory
+        )
 
         # Add the experience to the trainer tables in the correct form.
         self.write_experience_to_tables(trajectory, table_priorities)

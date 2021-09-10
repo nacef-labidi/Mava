@@ -22,12 +22,13 @@ This implements an N-step transition adder which collapses trajectory sequences
 into a single transition, simplifying to a simple transition adder when N=1.
 """
 import copy
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import numpy as np
 import reverb
 import tensorflow as tf
 import tree
+from acme.adders.reverb import utils as acme_utils
 from acme.adders.reverb.transition import NStepTransitionAdder, _broadcast_specs
 from acme.utils import tree_utils
 
@@ -35,7 +36,6 @@ from mava import specs as mava_specs
 from mava import types
 from mava import types as mava_types
 from mava.adders.reverb import base
-from mava.adders.reverb import utils as mava_utils
 from mava.adders.reverb.base import ReverbParallelAdder
 
 
@@ -86,7 +86,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         client: reverb.Client,
         n_step: int,
         discount: float,
-        int_to_nets: List[str] = None,
+        net_ids_to_keys: List[str] = None,
         table_network_config: Dict[str, List] = None,
         *,
         priority_fns: Optional[base.PriorityFnMapping] = None,
@@ -102,8 +102,8 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
             (s_t, a_t, r_t, d_t, s_t+1, e_t).
           discount: Discount factor to apply. This corresponds to the
             agent's discount in the class docstring.
-          int_to_nets: A list of network names to convert from integers to
-            strings.
+          net_ids_to_keys: A list of network keys. By indexing this list with the
+          network_id the corresponding network key will be returned.
           table_network_config: A dictionary mapping table names to lists of
             network names.
           priority_fns: See docstring for BaseAdder.
@@ -114,7 +114,7 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         # Makes the additional discount a float32, which means that it will be
         # upcast if rewards/discounts are float64 and left alone otherwise.
         self.n_step = n_step
-        self._int_to_nets = int_to_nets
+        self._net_ids_to_keys = net_ids_to_keys
         self._discount = tree.map_structure(np.float32, discount)
         self._first_idx = 0
         self._last_idx = 0
@@ -199,61 +199,12 @@ class ParallelNStepTransitionAdder(NStepTransitionAdder, ReverbParallelAdder):
         )
 
         # Calculate the priority for this transition.
-        table_priorities = mava_utils.calculate_priorities(
+        table_priorities = acme_utils.calculate_priorities(
             self._priority_fns, transition
         )
 
         # Add the experience to the trainer tables in the correct form.
         self.write_experience_to_tables(transition, table_priorities)
-
-    # TODO(Kale-ab) Consider deprecating in future versions and using acme
-    # version of this function.
-    def _compute_cumulative_quantities(
-        self, rewards: mava_types.NestedArray, discounts: mava_types.NestedArray
-    ) -> Tuple[mava_types.NestedArray, mava_types.NestedArray]:
-
-        # Give the same tree structure to the n-step return accumulator,
-        # n-step discount accumulator, and self.discount, so that they can be
-        # iterated in parallel using tree.map_structure.
-        rewards, discounts, self_discount = tree_utils.broadcast_structures(
-            rewards, discounts, self._discount
-        )
-        flat_rewards = tree.flatten(rewards)
-        flat_discounts = tree.flatten(discounts)
-        flat_self_discount = tree.flatten(self_discount)
-
-        # Copy total_discount as it is otherwise read-only.
-        total_discount = [np.copy(a[0]) for a in flat_discounts]
-
-        # Broadcast n_step_return to have the broadcasted shape of
-        # reward * discount.
-        n_step_return = [
-            np.copy(np.broadcast_to(r[0], np.broadcast(r[0], d).shape))
-            for r, d in zip(flat_rewards, total_discount)
-        ]
-
-        # NOTE: total_discount will have one less self_discount applied to it than
-        # the value of self._n_step. This is so that when the learner/update uses
-        # an additional discount we don't apply it twice. Inside the following loop
-        # we will apply this right before summing up the n_step_return.
-        for i in range(1, self._n_step):
-            for nsr, td, r, d, sd in zip(
-                n_step_return,
-                total_discount,
-                flat_rewards,
-                flat_discounts,
-                flat_self_discount,
-            ):
-                # Equivalent to: `total_discount *= self._discount`.
-                td *= sd
-                # Equivalent to: `n_step_return += reward[i] * total_discount`.
-                nsr += r[i] * td
-                # Equivalent to: `total_discount *= discount[i]`.
-                td *= d[i]
-
-        n_step_return = tree.unflatten_as(rewards, n_step_return)
-        total_discount = tree.unflatten_as(rewards, total_discount)
-        return n_step_return, total_discount
 
     @classmethod
     def signature(

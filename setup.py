@@ -26,20 +26,20 @@ _metadata = import_util.module_from_spec(spec)  # type: ignore
 spec.loader.exec_module(_metadata)  # type: ignore
 
 reverb_requirements = [
-    "dm-reverb~=0.3.1",
+    "dm-reverb~=0.4.0",
     "jax",
     "jaxlib",
 ]
 
 tf_requirements = [
-    "tensorflow~=2.5.0",
-    "tensorflow_probability==0.12.2",
+    "tensorflow~=2.6.0",
+    "tensorflow_probability~=0.13.0",
     "dm-sonnet",
     "trfl",
 ]
 
 env_requirements = [
-    "pettingzoo==1.9.0",
+    "pettingzoo~=1.11.0",
     "multi_agent_ale_py",
     "supersuit==2.6.6",
     "pygame",
@@ -47,7 +47,7 @@ env_requirements = [
 ]
 
 launchpad_requirements = [
-    "dm-launchpad-nightly==0.3.0.dev20210730",
+    "dm-launchpad-nightly",
 ]
 
 testing_formatting_requirements = [
@@ -93,7 +93,7 @@ setup(
     keywords="multi-agent reinforcement-learning python machine learning",
     packages=find_packages(),
     install_requires=[
-        "dm-acme~=0.2.1",
+        "dm-acme~=0.2.2",
         "absl-py",
         "dm_env",
         "dm-tree",

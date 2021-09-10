@@ -22,11 +22,10 @@ from typing import Any
 import launchpad as lp
 import sonnet as snt
 from absl import app, flags
-from launchpad.nodes.python.local_multi_processing import PythonProcess
 
 from mava.systems.tf import maddpg
 from mava.systems.tf.maddpg import make_default_networks
-from mava.utils import lp_utils
+from mava.utils import enums, lp_utils
 from mava.utils.environments import debugging_utils
 from mava.utils.loggers import logger_utils
 
@@ -46,7 +45,8 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "~/mava/", "Base dir to store experiments.")
+# TODO (dries): Change this back to "~/mava/"
+flags.DEFINE_string("base_dir", "/home/mava_logs/", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
@@ -82,26 +82,19 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         num_executors=2,
         shared_weights=False,
-        trainer_networks={
-            "trainer_0": ["network_0"],
-            "trainer_1": ["network_1"],
-            "trainer_2": ["network_2"],
-        },
-        executor_samples=[["network_0", "network_1", "network_2"]],
+        trainer_networks=enums.Trainer.one_trainer_per_network,
+        network_sampling_setup=enums.NetworkSampler.fixed_agent_networks,
         policy_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         max_gradient_norm=40.0,
     ).build()
 
-    # launch
-    gpu_id = -1
-    env_vars = {"CUDA_VISIBLE_DEVICES": str(gpu_id)}
-    local_resources = {
-        "trainer": [],
-        "evaluator": PythonProcess(env=env_vars),
-        "executor": PythonProcess(env=env_vars),
-    }
+    # Ensure only trainer runs on gpu, while other processes run on cpu.
+    local_resources = lp_utils.to_device(
+        program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
+    )
+
     lp.launch(
         program,
         lp.LaunchType.LOCAL_MULTI_PROCESSING,

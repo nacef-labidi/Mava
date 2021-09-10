@@ -14,6 +14,7 @@ class VariableSource:
         variables: Dict[str, Any],
         checkpoint: bool,
         checkpoint_subpath: str,
+        checkpoint_minute_interval: int,
     ) -> None:
         """Initialise the variable source
         Args:
@@ -42,7 +43,7 @@ class VariableSource:
             subdir = os.path.join("variable_source")
             self._checkpoint_time_interval = 5
             self._system_checkpointer = tf2_savers.Checkpointer(
-                time_delta_minutes=self._checkpoint_time_interval,
+                time_delta_minutes=checkpoint_minute_interval,
                 directory=checkpoint_subpath,
                 objects_to_save=save_variables,
                 subdirectory=subdir,

@@ -22,7 +22,7 @@ import dm_env
 import matplotlib.pyplot as plt
 import numpy as np
 from acme.utils import counting, loggers, paths
-from acme.wrappers.video import _make_animation
+from acme.wrappers.video import make_animation
 
 try:
     from array2gif import write_gif
@@ -240,6 +240,10 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
                     f"_{metric}_stats"
                 ).__getattribute__(stat)()
 
+        self._running_statistics.update({"episode_length": episode_steps})
+        self._running_statistics.update(counts)
+
+        # Write per agent statistics
         for agent, agent_return in episode_returns.items():
             agent_running_statistics: Dict[str, float] = {}
             self._agents_stats[agent]["return"].push(agent_return)
@@ -254,9 +258,6 @@ class DetailedPerAgentStatistics(DetailedEpisodeStatistics):
                     f"{agent}_{stat}_step_reward"
                 ] = self._agents_stats[agent]["reward"].__getattribute__(stat)()
             self._agent_loggers[agent].write(agent_running_statistics)
-
-        self._running_statistics.update({"episode_length": episode_steps})
-        self._running_statistics.update(counts)
 
 
 class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
@@ -366,7 +367,7 @@ class MonitorParallelEnvironmentLoop(ParallelEnvironmentLoop):
         plt.close("all")
 
     def _save_video(self, path: str) -> None:
-        video = _make_animation(self._frames, self._fps, self._figsize).to_html5_video()
+        video = make_animation(self._frames, self._fps, self._figsize).to_html5_video()
         with open(f"{path}.html", "w") as f:
             f.write(video)
 

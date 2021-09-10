@@ -76,42 +76,40 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
         max_gradient_norm: float = None,
         logger: loggers.Logger = None,
     ):
-        """Initialise MADDPG trainer
+        """Initialise MAD4PG trainer
         Args:
-            agents (List[str]): agent ids, e.g. "agent_0".
-            agent_types (List[str]): agent types, e.g. "speaker" or "listener".
-            policy_networks (Dict[str, snt.Module]): policy networks for each agent in
+            agents: agent ids, e.g. "agent_0".
+            agent_types: agent types, e.g. "speaker" or "listener".
+            policy_networks: policy networks for each agent in
                 the system.
-            critic_networks (Dict[str, snt.Module]): critic network(s), shared or for
+            critic_networks: critic network(s), shared or for
                 each agent in the system.
-            target_policy_networks (Dict[str, snt.Module]): target policy networks.
-            target_critic_networks (Dict[str, snt.Module]): target critic networks.
-            policy_optimizer (Dict[str, snt.Optimizer]):
+            target_policy_networks: target policy networks.
+            target_critic_networks: target critic networks.
+            policy_optimizer:
                 optimizer(s) for updating policy networks.
-            critic_optimizer (Dict[str, snt.Optimizer]):
+            critic_optimizer:
                 optimizer for updating critic networks.
-            discount (float): discount factor for TD updates.
-            target_averaging (bool): whether to use polyak averaging for target network
+            discounts: discount factor for TD updates.
+            target_averaging: whether to use polyak averaging for target network
                 updates.
-            target_update_period (int): number of steps before target networks are
+            target_update_period: number of steps before target networks are
                 updated.
-            target_update_rate (float): update rate when using averaging.
-            dataset (tf.data.Dataset): training dataset.
-            observation_networks (Dict[str, snt.Module]): network for feature
+            target_update_rate: update rate when using averaging.
+            dataset: training dataset.
+            observation_networks: network for feature
                 extraction from raw observation.
-            target_observation_networks (Dict[str, snt.Module]): target observation
+            target_observation_networks: target observation
                 network.
-            agent_net_keys: (dict, optional): specifies what network each agent uses.
-                Defaults to {}.
-            max_gradient_norm (float, optional): maximum allowed norm for gradients
-                before clipping is applied. Defaults to None.
-            counter (counting.Counter, optional): step counter object. Defaults to None.
-            logger (loggers.Logger, optional): logger object for logging trainer
-                statistics. Defaults to None.
-            checkpoint (bool, optional): whether to checkpoint networks. Defaults to
-                True.
-            checkpoint_subpath (str, optional): subdirectory for storing checkpoints.
-                Defaults to "~/mava/".
+            variable_client: The client used to manage the variables.
+            counts: step counter object.
+            num_steps: Use to track the number of steps before the target networks
+                are updated.
+            agent_net_keys: specifies what network each agent uses.
+            max_gradient_norm: maximum allowed norm for gradients
+                before clipping is applied.
+            logger: logger object for logging trainer
+                statistics.
         """
 
         """Initialise the decentralised MADDPG trainer."""
@@ -122,6 +120,8 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
             critic_networks=critic_networks,
             target_policy_networks=target_policy_networks,
             target_critic_networks=target_critic_networks,
+            policy_optimizer=policy_optimizer,
+            critic_optimizer=critic_optimizer,
             discounts=discounts,
             target_averaging=target_averaging,
             target_update_periods=target_update_periods,
@@ -129,14 +129,12 @@ class MAD4PGBaseTrainer(MADDPGBaseTrainer):
             dataset=dataset,
             observation_networks=observation_networks,
             target_observation_networks=target_observation_networks,
-            agent_net_keys=agent_net_keys,
-            policy_optimizer=policy_optimizer,
-            critic_optimizer=critic_optimizer,
-            max_gradient_norm=max_gradient_norm,
-            logger=logger,
             variable_client=variable_client,
             counts=counts,
             num_steps=num_steps,
+            agent_net_keys=agent_net_keys,
+            max_gradient_norm=max_gradient_norm,
+            logger=logger,
         )
 
     # Forward pass that calculates loss.
@@ -418,6 +416,42 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         logger: loggers.Logger = None,
         bootstrap_n: int = 10,
     ):
+        """Initialise Recurrent MAD4PG trainer
+
+        Args:
+            agents: agent ids, e.g. "agent_0".
+            agent_types: agent types, e.g. "speaker" or "listener".
+            policy_networks: policy networks for each agent in
+                the system.
+            critic_networks: critic network(s), shared or for
+                each agent in the system.
+            target_policy_networks: target policy networks.
+            target_critic_networks: target critic networks.
+            policy_optimizer:
+                optimizer(s) for updating policy networks.
+            critic_optimizer:
+                optimizer for updating critic networks.
+            discount: discount factor for TD updates.
+            target_averaging: whether to use polyak averaging for target network
+                updates.
+            target_update_period: number of steps before target networks are
+                updated.
+            target_update_rate: update rate when using averaging.
+            dataset: training dataset.
+            observation_networks: network for feature
+                extraction from raw observation.
+            target_observation_networks: target observation
+                network.
+            variable_client: The client used to manage the variables.
+            counts: step counter object.
+            num_steps: Use to track the number of steps before the target networks
+                are updated.
+            agent_net_keys: specifies what network each agent uses.
+            max_gradient_norm: maximum allowed norm for gradients
+                before clipping is applied.
+            logger: logger object for logging trainer
+                statistics.
+        """
 
         super().__init__(
             agents=agents,
@@ -449,7 +483,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
         """Trainer forward pass
 
         Args:
-            inputs (Any): input data from the data table (transitions)
+            inputs: input data from the data table (transitions)
         """
 
         # TODO: Update this forward function to work like MAD4PG
