@@ -41,7 +41,7 @@ class VariableSource:
 
             # Create checkpointer
             subdir = os.path.join("variable_source")
-            self._checkpoint_time_interval = 5
+            self._checkpoint_time_interval = checkpoint_minute_interval
             self._system_checkpointer = tf2_savers.Checkpointer(
                 time_delta_minutes=checkpoint_minute_interval,
                 directory=checkpoint_subpath,
