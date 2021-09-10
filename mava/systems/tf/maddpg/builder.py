@@ -728,6 +728,21 @@ class MADDPGBuilder:
         num_steps = variables["trainer_steps"]
         counts = {name: variables[name] for name in count_names}
 
+        # def compare_variables(var1, var2):
+        #     import numpy as np
+        #     assert len(var1) == len(var2)
+        #     matches_found = False
+        #     for i in range(len(var1)):
+        #         if np.any(var1[i] == var2[i]):
+        #             matches_found = True
+        #             print(i, ": ", var1[i] == var2[i])
+        #             print("var1[i]: ", var1[i])
+
+        #     return matches_found
+
+        # before_pol = copy.deepcopy(policy_opt["network_0"].variables)
+        # before_crit = copy.deepcopy(critic_opt["network_0"].variables)
+
         variable_client = variable_utils.VariableClient(
             client=variable_source,
             variables=variables,
@@ -738,6 +753,13 @@ class MADDPGBuilder:
 
         # Get all the initial variables
         variable_client.get_all_and_wait()
+
+        # after_pol = copy.deepcopy(policy_opt["network_0"].variables)
+        # after_crit = copy.deepcopy(critic_opt["network_0"].variables)
+
+        print("Any policy match: ", compare_variables(before_pol, after_pol))
+        print("Any critic match: ", compare_variables(before_crit, after_crit))
+        exit()
 
         # Convert network keys for the trainer.
         trainer_agents = self._agents[: len(trainer_table_entry)]
