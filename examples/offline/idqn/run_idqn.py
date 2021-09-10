@@ -10,7 +10,7 @@ from flatland.envs.rail_generators import sparse_rail_generator
 from flatland.envs.schedule_generators import sparse_schedule_generator
 
 from mava.systems.tf import idqn
-from mava.components.tf.modules.exploration import ExponentialExplorationScheduler
+from mava.components.tf.modules.exploration import ExponentialExplorationScheduler, LinearExplorationScheduler
 from mava.utils import lp_utils
 from mava.utils.environments.flatland_utils import flatland_env_factory
 from mava.utils.loggers import logger_utils
@@ -23,7 +23,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "logs/", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "logs", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
@@ -35,7 +35,7 @@ def main(_: Any) -> None:
 
     # Flatland environment config
     rail_gen_cfg: Dict = {
-        "max_num_cities": 2,
+        "max_num_cities": 3,
         "max_rails_between_cities": 2,
         "max_rails_in_city": 3,
         "grid_mode": False,
@@ -43,13 +43,13 @@ def main(_: Any) -> None:
     }
 
     flatland_env_config: Dict = {
-        "number_of_agents": 2,
+        "number_of_agents": 5,
         "width": 25,
         "height": 25,
         "rail_generator": sparse_rail_generator(**rail_gen_cfg),
         "schedule_generator": sparse_schedule_generator(),
         "obs_builder_object": TreeObsForRailEnv(
-            max_depth=2, predictor=ShortestPathPredictorForRailEnv()
+            max_depth=2, predictor=ShortestPathPredictorForRailEnv(max_depth=30)
         ),
     }
 
@@ -84,7 +84,7 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         num_executors=1, 
         learning_rate=1e-3,
-        max_replay_size=10_000,
+        max_replay_size=100_000,
         checkpoint_subpath=checkpoint_dir,
         batch_size=256,
         executor_variable_update_period=100,
@@ -92,7 +92,7 @@ def main(_: Any) -> None:
         executor_exploration_scheduler_kwargs={
             "epsilon_start": 1.0,
             "epsilon_min": 0.05,
-            "epsilon_decay": 1e-5,
+            "epsilon_decay": 0.9999995,
         },
     ).build()
 

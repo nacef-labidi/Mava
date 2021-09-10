@@ -55,7 +55,6 @@ class IDQNTrainer(mava.Trainer):
         target_update_period: int = 100,
         huber_loss_parameter: float = 1.,
         max_gradient_norm: Optional[float] = None,
-        replay_client: Optional[reverb.TFClient] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[loggers.Logger] = None,
         checkpoint: bool = True,
@@ -118,9 +117,6 @@ class IDQNTrainer(mava.Trainer):
         # Create an iterator to go through the dataset.
         self._iterator = iter(dataset)
 
-        # Replay client
-        self._replay_client = replay_client
-
         # Expose the network variables.
         q_networks_to_expose = {}
         self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
@@ -173,20 +169,6 @@ class IDQNTrainer(mava.Trainer):
                 for src, dest in zip(online_variables, target_variables):
                     dest.assign(src)
         self._num_steps.assign_add(1)
-
-    def _update_sample_priorities(self, keys: tf.Tensor, priorities: tf.Tensor) -> None:
-        """Update sample priorities in replay table using importance weights.
-
-        Args:
-            keys: keys of the replay samples.
-            priorities: new priorities for replay samples.
-        """
-        # Maybe update the sample priorities in the replay buffer.
-        if self._replay_client:
-            self._replay_client.mutate_priorities(
-                table=reverb_adders.DEFAULT_PRIORITY_TABLE,
-                updates=dict(zip(keys.numpy(), priorities.numpy())),
-            )
 
     def _get_feed_by_network_type(
         self, 
@@ -269,7 +251,9 @@ class IDQNTrainer(mava.Trainer):
             net_actions, net_rewards, net_discounts)
 
     @tf.function
-    def _speed_up(self):
+    def _step(self) -> Dict:
+        """Trainer forward and backward passes."""
+
         # Get data from replay (dropping extras if any). Note there is no
         # extra data here because we do not insert any into Reverb.
         inputs = next(self._iterator)
@@ -282,27 +266,6 @@ class IDQNTrainer(mava.Trainer):
 
         # Log losses
         fetches = self._q_network_losses
-
-        # Return keys and priorities
-        fetches.update(
-            {
-                "keys": self._keys,
-                "priorities": self._priorities
-            }
-        )
-
-        return fetches
-
-    def _step(self) -> Dict:
-        """Trainer forward and backward passes."""
-
-        fetches = self._speed_up()
-
-        # Maybe update priorities.
-        keys = fetches.pop("keys")
-        priorities = fetches.pop("priorities")
-        if self._replay_client:
-            self._update_sample_priorities(keys, priorities)
 
         return fetches
 
@@ -335,16 +298,15 @@ class IDQNTrainer(mava.Trainer):
             )
 
         self._q_network_losses: Dict[str, NestedArray] = {}
-        self._priorities = None
         with tf.GradientTape(persistent=True) as tape:
 
             for net_key in self._unique_net_keys:
                 q_tm1 = self._q_networks[net_key](net_observations[net_key])
                 q_t_value = self._target_q_networks[net_key](net_next_observations[net_key])
-                q_t_selector = self._q_networks[net_key](net_observations[net_key])
+                q_t_selector = self._q_networks[net_key](net_next_observations[net_key])
 
                 # Q-network learning
-                _, extra = trfl.double_qlearning(
+                loss, _ = trfl.double_qlearning(
                     q_tm1,
                     net_actions[net_key],
                     net_rewards[net_key],
@@ -353,16 +315,9 @@ class IDQNTrainer(mava.Trainer):
                     q_t_selector,
                 )
 
-                # Huber-loss
-                loss = losses.huber(extra.td_error, self._huber_loss_parameter)
+                # Store loss
                 loss = tf.reduce_mean(loss)  # []
                 self._q_network_losses[net_key] = {"q_value_loss": loss}
-
-                # Compute priorities.
-                if self._priorities is None:
-                    self._priorities = tf.abs(extra.td_error)
-                else:
-                    self._priorities += tf.abs(extra.td_error)
 
         # Store gradient tape
         self._tape = tape

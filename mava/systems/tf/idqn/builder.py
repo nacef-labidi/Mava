@@ -299,7 +299,6 @@ class IDQNBuilder:
         dataset: reverb.ReplaySample,
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
-        replay_client: Optional[reverb.Client] = None,
     ) -> core.Trainer:
         """Create a trainer instance.
 
@@ -332,7 +331,6 @@ class IDQNBuilder:
             target_update_period=self._config.target_update_period,
             max_gradient_norm=self._config.max_gradient_norm,
             dataset=dataset,
-            replay_client=replay_client,
             counter=counter,
             logger=logger,
             checkpoint=self._config.checkpoint,

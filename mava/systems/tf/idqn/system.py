@@ -254,7 +254,6 @@ class IDQN:
         return self._builder.make_trainer(
             networks=networks,
             dataset=dataset,
-            replay_client=replay,
             counter=counter,
             logger=trainer_logger,
         )
