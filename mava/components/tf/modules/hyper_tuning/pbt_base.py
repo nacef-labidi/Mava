@@ -39,6 +39,7 @@ class PBTVariableSource(MavaVariableSource):
         variables: Dict[str, Any],
         checkpoint: bool,
         checkpoint_subpath: str,
+        checkpoint_minute_interval: int,
         unique_net_keys: Sequence[str],
     ) -> None:
         """Initialise the variable source
@@ -47,6 +48,8 @@ class PBTVariableSource(MavaVariableSource):
             variables which should be stored in it.
             checkpoint (bool): Indicates whether checkpointing should be performed.
             checkpoint_subpath (str): checkpoint path
+            checkpoint_minute_interval (int): checkpoint interval in minutes
+            unique_net_keys (List[str]): list of unique network keys
         Returns:
             None
         """
@@ -67,6 +70,7 @@ class PBTVariableSource(MavaVariableSource):
         super().__init__(
             variables=variables,
             checkpoint=checkpoint,
+            checkpoint_minute_interval=checkpoint_minute_interval,
             checkpoint_subpath=checkpoint_subpath,
         )
 

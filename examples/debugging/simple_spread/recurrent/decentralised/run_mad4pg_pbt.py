@@ -90,7 +90,7 @@ def main(_: Any) -> None:
             "trainer_3": ["network_3"],
             "trainer_4": ["network_4"],
         },
-        executor_samples=[
+        network_sampling_setup=[
             ["network_0"],
             ["network_1"],
             ["network_2"],

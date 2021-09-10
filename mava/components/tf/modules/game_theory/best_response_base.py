@@ -40,6 +40,7 @@ class BRVariableSource(MavaVariableSource):
         variables: Dict[str, Any],
         checkpoint: bool,
         checkpoint_subpath: str,
+        checkpoint_minute_interval: int,
         unique_net_keys: Sequence[str],
     ) -> None:
         """Initialise the variable source
@@ -48,6 +49,7 @@ class BRVariableSource(MavaVariableSource):
             variables which should be stored in it.
             checkpoint (bool): Indicates whether checkpointing should be performed.
             checkpoint_subpath (str): checkpoint path
+            checkpoint_minute_interval (int): checkpoint interval in minutes
         Returns:
             None
         """
@@ -63,6 +65,7 @@ class BRVariableSource(MavaVariableSource):
             variables=variables,
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
+            checkpoint_minute_interval=checkpoint_minute_interval,
         )
 
     def run(self) -> None:
@@ -173,8 +176,8 @@ def BestResponseWrapper(  # noqa
                     self._agent_net_keys,
                 ) = sample_new_agent_keys(
                     agent_slots[:half_ind],
-                    self._executor_samples,
-                    self._net_to_ints,
+                    self._network_sampling_setup,
+                    self._net_keys_to_ids,
                 )
 
                 # Set the other half of the agents to use the best response network
@@ -183,7 +186,7 @@ def BestResponseWrapper(  # noqa
                 self._agent_net_keys.update({agent: net_key for agent in agent_slots})
                 self._network_int_keys_extras.update(
                     {
-                        agent: np.array(self._net_to_ints[net_key], dtype=np.int32)
+                        agent: np.array(self._net_keys_to_ids[net_key], dtype=np.int32)
                         for agent in agent_slots
                     }
                 )
@@ -204,7 +207,9 @@ def BestResponseWrapper(  # noqa
             self.__dict__ = builder.__dict__
 
             # Update the builder variables
-            self._config.net_to_ints["br_network"] = len(self._config.unique_net_keys)
+            self._config.net_keys_to_ids["br_network"] = len(
+                self._config.unique_net_keys
+            )
             self._config.unique_net_keys.append("br_network")
 
         def variable_server_fn(

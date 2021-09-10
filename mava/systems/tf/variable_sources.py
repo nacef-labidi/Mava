@@ -22,6 +22,7 @@ class VariableSource:
             variables which should be stored in it.
             checkpoint (bool): Indicates whether checkpointing should be performed.
             checkpoint_subpath (str): checkpoint path
+            checkpoint_minute_interval (int): checkpoint interval in minutes
         Returns:
             None
         """
