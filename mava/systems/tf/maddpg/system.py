@@ -279,6 +279,8 @@ class MADDPG:
                 raise ValueError(
                     "trainer_networks does not support this enums setting."
                 )
+        else:
+            self._trainer_networks = trainer_networks  # type: ignore
 
         # Get all the unique trainer network keys
         all_trainer_net_keys = []
