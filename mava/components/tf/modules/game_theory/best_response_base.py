@@ -69,13 +69,13 @@ class BRVariableSource(MavaVariableSource):
         )
 
         # Reset BR variables
-        network_type_keys = ["policies", "observations"]
-        for network_type in network_type_keys:
-            # Loop through tuple
-            br_key = f"br_network_{network_type}"
-            for var_i in range(len(self.variables[br_key])):
-                var_sum = tf.zeros(self.variables[br_key][var_i].shape)
-                self.variables[br_key][var_i].assign(var_sum)
+        # network_type_keys = ["policies", "observations"]
+        # for network_type in network_type_keys:
+        #     # Loop through tuple
+        #     br_key = f"br_network_{network_type}"
+        #     for var_i in range(len(self.variables[br_key])):
+        #         var_sum = tf.zeros(self.variables[br_key][var_i].shape)
+        #         self.variables[br_key][var_i].assign(var_sum)
 
     def run(self) -> None:
         """Run the variable source. This function allows for
