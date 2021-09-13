@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """Independent DQN system trainer implementation."""
-
+import os
 import copy
 import time
 from typing import Dict, List, Optional, Sequence, Tuple
@@ -137,6 +137,8 @@ class IDQNTrainer(mava.Trainer):
             self._system_checkpointer = {}
             for net_key in self._unique_net_keys:
 
+                subdir = os.path.join("trainer", net_key)
+
                 checkpointer = tf2_savers.Checkpointer(
                     directory=checkpoint_subpath,
                     time_delta_minutes=checkpoint_minute_interval,
@@ -147,6 +149,7 @@ class IDQNTrainer(mava.Trainer):
                         "optimizer": self._optimizers[net_key],
                         "num_steps": self._num_steps,
                     },
+                    subdirectory=subdir,
                     enable_checkpointing=checkpoint,
                 )
 

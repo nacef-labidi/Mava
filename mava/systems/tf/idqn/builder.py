@@ -81,7 +81,6 @@ class IDQNConfig:
     prefetch_size: int
     batch_size: int
     n_step: int
-    prioritized_sampling: bool
     discount: float
     checkpoint: bool
     checkpoint_minute_interval: int
@@ -160,18 +159,10 @@ class IDQNBuilder:
                 error_buffer=error_buffer,
             )
 
-        # Setup sampler
-        if self._config.prioritized_sampling:
-            sampler = reverb.selectors.Prioritized(
-                self._config.importance_sampling_exponent
-            )
-        else:
-            sampler = reverb.selectors.Uniform()
-
         # Create replay table
         replay_table = reverb.Table(
             name=reverb_adders.DEFAULT_PRIORITY_TABLE,
-            sampler=sampler,
+            sampler=reverb.selectors.Uniform(),
             remover=reverb.selectors.Fifo(),
             max_size=self._config.max_replay_size,
             rate_limiter=limiter,

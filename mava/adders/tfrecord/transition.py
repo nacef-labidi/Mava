@@ -44,7 +44,6 @@ class TFRecordParallelTransitionAdder(TFRecordParallelAdder):
         self,
         environment_spec: MAEnvironmentSpec,
         transitions_per_file: int = 100_000,
-        id: str = str(datetime.now()),
         subdir: str = DEFAULT_SUBDIR,
     ):
         """Initialise TFRecord Transition Adder.
@@ -57,7 +56,7 @@ class TFRecordParallelTransitionAdder(TFRecordParallelAdder):
                 "~/mava/tfrecords/".
 
         """
-        super().__init__(environment_spec, id, subdir)
+        super().__init__(environment_spec, subdir)
 
         # A variable to store the last observation.
         self._observations: Dict = {}

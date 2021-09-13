@@ -24,7 +24,7 @@ from acme import types
 
 from mava.specs import MAEnvironmentSpec
 
-DEFAULT_SUBDIR = "./tfrecords"
+DEFAULT_SUBDIR = "~/tfrecords"
 
 
 class TFRecordParallelAdder:
@@ -33,7 +33,6 @@ class TFRecordParallelAdder:
     def __init__(
         self,
         environment_spec: MAEnvironmentSpec,
-        id: str = str(datetime.now()),
         subdir: str = DEFAULT_SUBDIR,
     ):
         """A TFRecord Base Adder.
@@ -51,7 +50,7 @@ class TFRecordParallelAdder:
         self._environment_spec = environment_spec
 
         # Join id and subdir.
-        self._subdir: str = os.path.join(subdir, id)
+        self._subdir: str = subdir
 
         # Make the directory if it does not exist.
         Path(self._subdir).mkdir(parents=True, exist_ok=True)

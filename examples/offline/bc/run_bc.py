@@ -68,7 +68,7 @@ def main(_: Any) -> None:
     # Dataset factory
     dataset_factory = functools.partial(
         tfrecord_transition_dataset,
-        path="tfrecords/bc_dataset",
+        path="logs/2021-09-13 14:06:54.301347/tfrecords",
         environment_spec=environment_spec,
         shuffle_buffer_size=10_000,
     )

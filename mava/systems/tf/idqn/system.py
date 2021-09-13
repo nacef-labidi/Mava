@@ -14,7 +14,7 @@
 # limitations under the License.
 
 """IDQN system implementation."""
-
+import os
 import functools
 from typing import Any, Callable, Dict, Optional, Type
 
@@ -79,14 +79,13 @@ class IDQN:
         max_gradient_norm: float = None,
         discount: float = 0.99,
         shared_weights: bool = True,
-        prioritized_sampling: bool = False,
         learning_rate: float = 1e-3,
         target_update_period: int = 100,
         executor_variable_update_period: int = 1000,
         max_executor_steps: int = None,
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
-        checkpoint_minute_interval: int = 5,
+        checkpoint_minute_interval: int = 15,
         logger_config: Dict = {},
         train_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
@@ -156,7 +155,6 @@ class IDQN:
                 evaluator_exploration_scheduler_kwargs=evaluator_exploration_scheduler_kwargs,
                 discount=discount,
                 batch_size=batch_size,
-                prioritized_sampling=prioritized_sampling,
                 learning_rate=learning_rate,
                 prefetch_size=prefetch_size,
                 target_update_period=target_update_period,
@@ -426,3 +424,211 @@ class IDQN:
                 )
 
         return program
+
+
+class IDQNEvaluator:
+    """IDQN evaluator process only."""
+
+    def __init__(
+        self,
+        checkpoint_subpath: str,
+        log_subpath: str,
+        environment_factory: Callable[[bool], dm_env.Environment],
+        network_factory: Callable[[acme_specs.BoundedArray], Dict[str, snt.Module]],
+        logger_factory: Callable[[str], MavaLogger] = None,
+        logger_config: Dict = {},
+        evaluator_exploration_scheduler_fn: Type[
+            ConstantExplorationScheduler
+        ] = ConstantExplorationScheduler,
+        evaluator_exploration_scheduler_kwargs: Dict = {
+            "epsilon_start": 0.0,
+            "epsilon_min": None,
+            "epsilon_decay": None,
+        },
+        executor_fn: Type[core.Executor] = execution.IDQNFeedForwardExecutor,
+        agent_net_keys: Dict[str, str] = {},
+        shared_weights: bool = True,
+        eval_loop_fn: Callable = ParallelEnvironmentLoop,
+        eval_loop_fn_kwargs: Dict = {},
+        tfrecord_adder_factory: Optional[Type[TFRecordParallelAdder]] = None,
+        tfrecord_adder_kwargs: Dict = {}
+    ):
+        # Make environment spec
+        self._environment_spec = mava_specs.MAEnvironmentSpec(
+            environment_factory(evaluation=False)  # type:ignore
+        )
+
+        # Set default logger if no logger provided
+        if not logger_factory:
+            logger_factory = functools.partial(
+                logger_utils.make_logger,
+                directory="~/mava",
+                to_terminal=True,
+                time_delta=10,
+            )
+
+        # Store factories
+        self._environment_factory = environment_factory
+        self._network_factory = network_factory
+        self._logger_factory = logger_factory
+
+        # System Config
+        self._checkpoint_subpath = checkpoint_subpath
+        self._logger_config = logger_config
+        self._evaluator_exploration_scheduler_fn = evaluator_exploration_scheduler_fn
+        self._evaluator_exploration_scheduler_kwargs = evaluator_exploration_scheduler_kwargs
+        self._executor_fn=executor_fn
+        self._eval_loop_fn = eval_loop_fn
+        self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
+        
+        # Setup agent networks
+        self._agent_net_keys = agent_net_keys
+        if not agent_net_keys:
+            agents = self._environment_spec.get_agent_ids()
+            self._agent_net_keys = {
+                agent: agent.split("_")[0] if shared_weights else
+                    agent for agent in agents
+            }
+
+        # Maybe instantiate TFRecordAdder.
+        if tfrecord_adder_factory:
+            # Save tfrecords alongside tensorboard logs and checkpoints
+            # if subdir not given.
+            if "subdir" not in tfrecord_adder_kwargs.keys():
+                tfrecord_adder_kwargs["subdir"] = os.path.join(log_subpath, "tfrecords")
+            # Made adder
+            self._tfrecord_adder = tfrecord_adder_factory(
+                self._environment_spec, **tfrecord_adder_kwargs
+            )
+        else:
+            # TODO (Claude): fix this typing error.
+            self._tfrecord_adder = None  # type: ignore
+
+    def _get_system_checkpointer(self, q_networks):
+        system_checkpointer = {}
+        for net_key in self._agent_net_keys.values():
+            # Load from trainer checkpoints
+            subdir = subdir = os.path.join("trainer", net_key)
+            # Create checkpointer
+            checkpointer = tf2_savers.Checkpointer(
+                directory=self._checkpoint_subpath,
+                objects_to_save={
+                    "q_network": q_networks[net_key],
+                },
+                subdirectory=subdir,
+                enable_checkpointing=True,
+            ).restore()
+            # Store checkpointer
+            system_checkpointer[net_key] = checkpointer
+
+        return system_checkpointer
+
+    def _make_executor(self, q_networks, action_selectors):
+        # Sanity check
+        before_sum =  list(q_networks.values())[0].variables[1].numpy().sum()
+
+        # Get new network variables from checkpoint
+        system_checkpointer = self._get_system_checkpointer(q_networks)
+
+        # Sanity check
+        after_sum = list(q_networks.values())[0].variables[1].numpy().sum()
+        assert before_sum != after_sum
+
+        # Make exploration scheduler
+        exploration_scheduler = self._evaluator_exploration_scheduler_fn(
+            **self._evaluator_exploration_scheduler_kwargs
+        )
+
+        # Create executor
+        executor = self._executor_fn(
+            q_networks=q_networks,
+            action_selectors=action_selectors,
+            agent_net_keys=self._agent_net_keys,
+            exploration_scheduler=exploration_scheduler
+        )
+
+        return executor
+
+    def counter(self):
+        return counting.Counter()
+
+    def evaluator(
+        self,
+        counter: counting.Counter,
+    ) -> Any:
+        """System evaluator i.e. an executor process not connected to a dataset.
+
+        Args:
+            counter (counting.Counter): step counter object.
+
+        Returns:
+            Any: environment-executor evaluation loop instance for evaluating the
+                performance of a system.
+        """
+
+        # Create the networks
+        networks = self._network_factory(  # type: ignore
+            environment_spec=self._environment_spec,
+            agent_net_keys=self._agent_net_keys,
+        )
+
+        # Create the agent.
+        executor = self._make_executor(
+            q_networks=networks["q-networks"],
+            action_selectors=networks["action_selectors"],
+        )
+
+        # Maybe wrap executor in TFRecord wrapper.
+        # TODO (Claude): fix this typing error.
+        if self._tfrecord_adder:
+            executor = TFRecordWrapper(executor, self._tfrecord_adder)  # type: ignore
+
+        # Make the environment.
+        environment = self._environment_factory(evaluation=True)  # type: ignore
+
+        # Create logger and counter.
+        counter = counting.Counter(counter, "evaluator")
+        evaluator_logger_config = {}
+        if self._logger_config and "evaluator" in self._logger_config:
+            evaluator_logger_config = self._logger_config["evaluator"]
+        eval_logger = self._logger_factory(  # type: ignore
+            "evaluator", **evaluator_logger_config
+        )
+
+        # Create the run loop and return it.
+        # Create the loop to connect environment and executor.
+        eval_loop = self._eval_loop_fn(
+            environment,
+            executor,
+            counter=counter,
+            logger=eval_logger,
+            **self._eval_loop_fn_kwargs,
+        )
+
+        # Stats wrapper
+        eval_loop = DetailedPerAgentStatistics(eval_loop)
+
+        return eval_loop
+
+    def build(self, name: str = "idqn-evaluator") -> Any:
+        """Build the distributed system as a graph program.
+
+        Args:
+            name (str, optional): system name. Defaults to "madqn".
+
+        Returns:
+            Any: graph program for distributed system training.
+        """
+
+        program = lp.Program(name=name)
+
+        with program.group("counter"):
+            counter = program.add_node(lp.CourierNode(self.counter))
+
+        with program.group("evaluator"):
+            program.add_node(lp.CourierNode(self.evaluator, counter))
+
+        return program
+
+        
+

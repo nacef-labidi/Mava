@@ -14,5 +14,5 @@
 # limitations under the License.
 """Independent DQN."""
 from mava.systems.tf.idqn.networks import make_default_networks
-from mava.systems.tf.idqn.system import IDQN
+from mava.systems.tf.idqn.system import IDQN, IDQNEvaluator
 from mava.systems.tf.idqn.training import IDQNTrainer
