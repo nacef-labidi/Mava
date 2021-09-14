@@ -81,7 +81,12 @@ class MADDPGConfig:
         logger: logger to use.
         checkpoint: boolean to indicate whether to checkpoint models.
         checkpoint_subpath: subdirectory specifying where to store checkpoints.
-        replay_table_name: string indicating what name to give the replay table."""
+        replay_table_name: string indicating what name to give the replay table.
+        termination_condition: An optional terminal condition can be provided
+        that stops the program once the condition is satisfied. Available options
+        include specifying maximum values for trainer_steps, trainer_walltime,
+        evaluator_steps, evaluator_episodes, executor_episodes or executor_steps.
+        E.g. termination_condition = {'trainer_steps': 100000}."""
 
     environment_spec: specs.MAEnvironmentSpec
     policy_optimizer: Dict[str, snt.Optimizer]
@@ -115,6 +120,7 @@ class MADDPGConfig:
     checkpoint: bool = True
     checkpoint_subpath: str = "~/mava/"
     replay_table_name: str = "trainer"  # reverb_adders.DEFAULT_PRIORITY_TABLE
+    termination_condition: Optional[Dict[str, int]] = None
 
 
 class MADDPGBuilder:
@@ -486,9 +492,14 @@ class MADDPGBuilder:
         checkpoint_subpath: str,
         checkpoint_minute_interval: int,
         unique_net_keys: List[str],
+        termination_condition: Optional[Dict[str, Any]],
     ) -> MavaVariableSource:
         return MavaVariableSource(
-            variables, checkpoint, checkpoint_subpath, checkpoint_minute_interval
+            variables,
+            checkpoint,
+            checkpoint_subpath,
+            checkpoint_minute_interval,
+            termination_condition,
         )
 
     def init_optimizers(
@@ -552,6 +563,7 @@ class MADDPGBuilder:
             self._config.checkpoint_subpath,
             self._config.checkpoint_minute_interval,
             self._config.unique_net_keys,
+            self._config.termination_condition,
         )
         return variable_source
 

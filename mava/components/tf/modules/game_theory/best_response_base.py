@@ -42,6 +42,7 @@ class BRVariableSource(MavaVariableSource):
         checkpoint_subpath: str,
         checkpoint_minute_interval: int,
         unique_net_keys: Sequence[str],
+        termination_condition: Union[Dict, None] = None,
     ) -> None:
         """Initialise the variable source
         Args:
@@ -50,6 +51,9 @@ class BRVariableSource(MavaVariableSource):
             checkpoint (bool): Indicates whether checkpointing should be performed.
             checkpoint_subpath (str): checkpoint path
             checkpoint_minute_interval (int): checkpoint interval in minutes
+            unique_net_keys (Sequence[str]): keys of the networks which should be
+            checkpointed.
+            termination_condition (Union[Dict, None]): termination condition
         Returns:
             None
         """
@@ -66,6 +70,7 @@ class BRVariableSource(MavaVariableSource):
             checkpoint=checkpoint,
             checkpoint_subpath=checkpoint_subpath,
             checkpoint_minute_interval=checkpoint_minute_interval,
+            termination_condition=termination_condition,
         )
 
         # Reset BR variables

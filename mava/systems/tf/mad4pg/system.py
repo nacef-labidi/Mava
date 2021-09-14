@@ -87,6 +87,7 @@ class MAD4PG(MADDPG):
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        termination_condition: Optional[Dict[str, int]] = None,
     ):
         """Initialise the system
 
@@ -109,6 +110,17 @@ class MAD4PG(MADDPG):
             trainer_networks: networks each trainer trains on.
             network_sampling_setup: List of networks that are randomly
                 sampled from by the executors at the start of an environment run.
+                enums.NetworkSampler settings:
+                fixed_agent_networks: Keeps the networks
+                used by each agent fixed throughout training.
+                random_agent_networks: Creates N network policies, where N is the
+                number of agents. Randomly select policies from this sets for each
+                agent at the start of a episode. This sampling is done with
+                replacement so the same policy can be selected for more than one
+                agent for a given episode.
+                Custom list: Alternatively one can specify a custom nested list,
+                with network keys in, that will be used by the executors at
+                the start of each episode to sample networks for each agent.
             shared_weights: whether agents should share weights or not.
                 When network_sampling_setup are provided the value of shared_weights is
                 ignored.
@@ -154,6 +166,12 @@ class MAD4PG(MADDPG):
                 to the training loop.
             eval_loop_fn_kwargs: possible keyword arguments to send to
             the evaluation loop.
+            termination_condition: An optional terminal condition can be
+                provided that stops the program once the condition is
+                satisfied. Available options include specifying maximum
+                values for trainer_steps, trainer_walltime, evaluator_steps,
+                evaluator_episodes, executor_episodes or executor_steps.
+                E.g. termination_condition = {'trainer_steps': 100000}.
         """
 
         super().__init__(
@@ -194,4 +212,5 @@ class MAD4PG(MADDPG):
             eval_loop_fn_kwargs=eval_loop_fn_kwargs,
             target_averaging=target_averaging,
             target_update_rate=target_update_rate,
+            termination_condition=termination_condition,
         )
