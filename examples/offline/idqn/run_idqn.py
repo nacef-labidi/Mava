@@ -46,7 +46,7 @@ def main(_: Any) -> None:
     }
 
     flatland_env_config: Dict = {
-        "number_of_agents": 5,
+        "number_of_agents": 2,
         "width": 25,
         "height": 25,
         "rail_generator": sparse_rail_generator(**rail_gen_cfg),
@@ -63,7 +63,12 @@ def main(_: Any) -> None:
 
     # Networks factory
     network_factory = lp_utils.partial_kwargs(
-        idqn.make_default_networks, q_network_layer_sizes=(128,)
+        idqn.make_default_networks, 
+        q_network_layer_sizes=(128,),
+        distributional=True,
+        num_atoms=51,
+        vmin=-400,
+        vmax=-1,
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -85,7 +90,7 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=3, 
+        num_executors=1, 
         learning_rate=5e-4,
         max_replay_size=100_000,
         checkpoint_subpath=checkpoint_dir,
@@ -96,8 +101,10 @@ def main(_: Any) -> None:
         executor_exploration_scheduler_kwargs={
             "epsilon_start": 1.0,
             "epsilon_min": 0.05,
-            "epsilon_decay": 1 - 0.9999995,
-        }
+            "epsilon_decay": 2e-5
+            # "epsilon_decay": 1 - 0.9999995,
+        },
+        distributional=True
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.

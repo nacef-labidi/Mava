@@ -85,7 +85,7 @@ class IDQNConfig:
     checkpoint: bool
     checkpoint_minute_interval: int
     checkpoint_subpath: str
-
+    distributional: bool
 
 class IDQNBuilder:
     """Builder for IDQN which constructs individual components of the system."""
@@ -222,11 +222,10 @@ class IDQNBuilder:
 
     def make_executor(
         self,
-        q_networks: Dict[str, snt.Module],
-        action_selectors: Dict[str, Any],
+        networks: Dict[str, Dict[str, snt.Module]],
         adder: Optional[adders.ParallelAdder] = None,
         variable_source: Optional[core.VariableSource] = None,
-        is_evaluator: bool = False
+        is_evaluator: bool = False,
     ) -> core.Executor:
         """Create an executor instance.
 
@@ -244,6 +243,14 @@ class IDQNBuilder:
                 of the system generating data by interacting the environment.
         """
         agent_net_keys = self._config.agent_net_keys
+
+        # Q-networks
+        q_networks = networks["q-networks"]
+        action_selectors = networks["action_selectors"]
+
+        # Network supports
+        if self._config.distributional:
+            network_supports = networks["supports"]
 
         # Variable updator
         variable_client = None
@@ -281,7 +288,9 @@ class IDQNBuilder:
             agent_net_keys=agent_net_keys,
             variable_client=variable_client,
             adder=adder,
-            exploration_scheduler=exploration_scheduler
+            exploration_scheduler=exploration_scheduler,
+            network_supports=network_supports,
+            distributional=self._config.distributional
         )
 
     def make_trainer(
@@ -309,6 +318,11 @@ class IDQNBuilder:
         # Get Q-networks
         q_networks = networks["q-networks"]
 
+        # Get network supports
+        if self._config.distributional:
+            network_supports = networks["supports"]
+        else: network_supports = None
+
         # Get agent info
         agents = self._config.environment_spec.get_agent_ids()
 
@@ -327,6 +341,8 @@ class IDQNBuilder:
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
             checkpoint_minute_interval=self._config.checkpoint_minute_interval,
+            network_supports=network_supports,
+            distributional=self._config.distributional
         )
 
         trainer = DetailedTrainerStatistics(

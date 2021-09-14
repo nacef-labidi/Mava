@@ -13,10 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Dict, Mapping, Optional, Sequence, Union
+from acme.tf.networks import distributional
+from numpy.core.fromnumeric import nonzero
 
 import tensorflow as tf
+from tensorflow.keras.layers import Input, Dense, Reshape, Softmax
+import sonnet as snt
 from acme import types
 from acme.tf import utils as tf2_utils
+from acme.tf.networks.distributional import DiscreteValuedHead
+
 
 from mava import specs as mava_specs
 from mava.components.tf import networks
@@ -26,6 +32,10 @@ def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
     q_network_layer_sizes: Sequence = (256,256),
+    distributional: bool = False,
+    num_atoms: int = 51,
+    vmin: int = -100,
+    vmax: int = 100
 ) -> Mapping[str, types.TensorTransformation]:
     # Get env spec  
     specs = environment_spec.get_agent_specs()
@@ -43,14 +53,29 @@ def make_default_networks(
 
     q_networks = {}
     action_selectors = {}
+    network_supports = {}
     for key, spec in specs.items():
 
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
-        q_network = networks.LayerNormMLP(
-            list(q_network_layer_sizes) + [num_dimensions],
-            activate_final=False,
-        )
+        
+        # If distributional, add DiscretValueHead
+        if distributional:
+            q_network = snt.Sequential(
+                [
+                    networks.LayerNormMLP(
+                            list(q_network_layer_sizes) + [num_atoms * num_dimensions],
+                            activate_final=False,
+                    ),
+                    tf.keras.layers.Reshape((num_dimensions, num_atoms))
+                ]
+            )
+            network_supports[key] = tf.cast(tf.linspace(vmin, vmax, num_atoms), dtype='float32')
+        else:
+            q_network = networks.LayerNormMLP(
+                            list(q_network_layer_sizes) + [num_dimensions],
+                            activate_final=False,
+                        )
 
         # Get observation spec for the network
         obs_spec = spec.observations.observation
@@ -64,4 +89,8 @@ def make_default_networks(
     return {
         "q-networks": q_networks,
         "action_selectors": action_selectors,
+        "supports": network_supports
     }
+
+
+

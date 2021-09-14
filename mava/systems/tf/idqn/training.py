@@ -28,6 +28,7 @@ from acme.tf import losses
 from acme.tf import utils as tf2_utils
 from acme.types import NestedArray
 from acme.utils import counting, loggers
+from acme.tf.networks.distributions import DiscreteValuedDistribution
 
 import mava
 from mava import types as mava_types
@@ -53,13 +54,14 @@ class IDQNTrainer(mava.Trainer):
         learning_rate: float = 1e-3,
         discount: float = 0.99,
         target_update_period: int = 100,
-        huber_loss_parameter: float = 1.,
         max_gradient_norm: Optional[float] = None,
         counter: Optional[counting.Counter] = None,
         logger: Optional[loggers.Logger] = None,
         checkpoint: bool = True,
         checkpoint_minute_interval: int = 15,
         checkpoint_subpath: str = "~/mava/",
+        distributional: bool = False,
+        network_supports: Dict = None
     ):
         """Independet DQN Trainer.
 
@@ -72,7 +74,6 @@ class IDQNTrainer(mava.Trainer):
             discount (float, optional): [description]. Defaults to 0.99.
             target_update_period (int, optional): [description]. Defaults to 100.
             importance_sampling_exponent (float, optional): [description]. Defaults to 0.2.
-            huber_loss_parameter (float, optional): [description]. Defaults to 1..
             max_gradient_norm (Optional[float], optional): [description]. Defaults to None.
             replay_client (Optional[reverb.TFClient], optional): [description]. Defaults to None.
             counter (Optional[counting.Counter], optional): [description]. Defaults to None.
@@ -93,9 +94,12 @@ class IDQNTrainer(mava.Trainer):
         for key, net in q_networks.items():
             self._target_q_networks[key] = copy.deepcopy(net)
 
+        # Distributional Q-learning stuff
+        self._distributional = distributional
+        self._network_supports = network_supports
+
         # Store hyper-parameters
         self._discount = discount
-        self._huber_loss_parameter = huber_loss_parameter
         self._target_update_period = target_update_period
 
         # Create optimizers
@@ -294,6 +298,9 @@ class IDQNTrainer(mava.Trainer):
             trans.next_extras,
         )
 
+        # Get batch_size
+        batch_size = list(actions.values())[0].shape[0]
+
         # Get feed by network type
         (net_observations, net_next_observations, net_actions, 
             net_rewards, net_discounts) = self._get_feed_by_network_type(
@@ -304,19 +311,39 @@ class IDQNTrainer(mava.Trainer):
         with tf.GradientTape(persistent=True) as tape:
 
             for net_key in self._unique_net_keys:
-                q_tm1 = self._q_networks[net_key](net_observations[net_key])
-                q_t_value = self._target_q_networks[net_key](net_next_observations[net_key])
-                q_t_selector = self._q_networks[net_key](net_next_observations[net_key])
+                
+                
+                if self._distributional:
+                    support = self._network_supports[net_key]
 
-                # Q-network learning
-                loss, _ = trfl.double_qlearning(
-                    q_tm1,
-                    net_actions[net_key],
-                    net_rewards[net_key],
-                    self._discount * net_discounts[net_key],
-                    q_t_value,
-                    q_t_selector,
-                )
+                    logits = self._q_networks[net_key](net_observations[net_key])
+
+                    target_logits = self._target_q_networks[net_key](net_observations[net_key])
+
+                    # trfl distributional Q-learning
+                    loss, _ = trfl.categorical_dist_qlearning(
+                        support,
+                        logits,
+                        net_actions[net_key],
+                        net_rewards[net_key],
+                        net_discounts[net_key],
+                        support, 
+                        target_logits
+                    )
+                else:
+                    q_tm1 = self._q_networks[net_key](net_observations[net_key])
+                    q_t_value = self._target_q_networks[net_key](net_next_observations[net_key])
+                    q_t_selector = self._q_networks[net_key](net_next_observations[net_key])
+
+                    # trfl double Q-learning
+                    loss, _ = trfl.double_qlearning(
+                        q_tm1,
+                        net_actions[net_key],
+                        net_rewards[net_key],
+                        self._discount * net_discounts[net_key],
+                        q_t_value,
+                        q_t_selector,
+                    )
 
                 # Store loss
                 loss = tf.reduce_mean(loss)  # []

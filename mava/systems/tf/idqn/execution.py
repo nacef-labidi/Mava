@@ -22,6 +22,7 @@ import tensorflow as tf
 from acme import types
 from acme.tf import utils as tf2_utils
 from acme.tf import variable_utils as tf2_variable_utils
+from acme.tf.networks.distributions import DiscreteValuedDistribution
 
 from mava import adders
 from mava.components.tf.modules import exploration
@@ -45,6 +46,8 @@ class IDQNFeedForwardExecutor(FeedForwardExecutor):
         exploration_scheduler: BaseExplorationScheduler, 
         adder: Optional[adders.ParallelAdder] = None,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+        distributional: bool = False,
+        network_supports: Dict = None
     ):
         """Initialise the system executor
 
@@ -70,6 +73,10 @@ class IDQNFeedForwardExecutor(FeedForwardExecutor):
         self._action_selectors = action_selectors
         self._agent_net_keys = agent_net_keys
         self._exploration_scheduler = exploration_scheduler
+
+        # Distributional Q-learning stuff
+        self._distributional = distributional
+        self._network_supports = network_supports
 
     def _policy(
         self,
@@ -102,7 +109,15 @@ class IDQNFeedForwardExecutor(FeedForwardExecutor):
         net_key = self._agent_net_keys[agent]
 
         # Compute the policy, conditioned on the observation.
-        q_values = self._q_networks[net_key](batched_observation)
+        if self._distributional:
+            # Get network support
+            support = self._network_supports[net_key]
+
+            logits = self._q_networks[net_key](batched_observation)
+            z = tf.nn.softmax(logits, axis=-1)
+            q_values = tf.reduce_sum(support * z, axis=-1)          
+        else:
+            q_values = self._q_networks[net_key](batched_observation)
 
         # Select legal action
         action = self._action_selectors[net_key](

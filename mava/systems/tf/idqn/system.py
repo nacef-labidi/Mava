@@ -93,6 +93,7 @@ class IDQN:
         eval_loop_fn_kwargs: Dict = {},
         tfrecord_adder_factory: Optional[Type[TFRecordParallelAdder]] = None,
         tfrecord_adder_kwargs: Dict = {},
+        distributional: bool = False,
     ):
         # Make environment spec
         self._environment_spec = mava_specs.MAEnvironmentSpec(
@@ -167,6 +168,7 @@ class IDQN:
                 checkpoint=checkpoint,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
+                distributional=distributional
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -282,10 +284,10 @@ class IDQN:
             agent_net_keys=self._agent_net_keys,
         )
 
+
         # Create the executor.
         executor = self._builder.make_executor(
-            q_networks=networks["q-networks"],
-            action_selectors=networks["action_selectors"],
+            networks=networks,
             adder=self._builder.make_adder(replay),
             variable_source=variable_source,
         )
@@ -344,8 +346,7 @@ class IDQN:
 
         # Create the agent.
         executor = self._builder.make_executor(
-            q_networks=networks["q-networks"],
-            action_selectors=networks["action_selectors"],
+            networks=networks,
             variable_source=variable_source,
             is_evaluator=True
         )
