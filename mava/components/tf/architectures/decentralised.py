@@ -224,6 +224,16 @@ class DecentralisedValueActorCritic(BaseActorCritic):
 
         if not net_spec_keys:
             # Check if the agents use all the networks.
+            print(
+                "self._policy_networks: ",
+                self._policy_networks.keys(),
+                len(self._policy_networks.keys()),
+            )
+            print(
+                "self._agent_net_keys: ",
+                self._agent_net_keys.values(),
+                len(self._agent_net_keys.values()),
+            )
             assert len(self._policy_networks.keys()) == len(
                 set(self._agent_net_keys.values())
             )

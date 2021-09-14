@@ -195,6 +195,7 @@ class MADDPGFeedForwardExecutor(executors.FeedForwardExecutor):
         )
 
         extras["network_int_keys"] = self._network_int_keys_extras
+
         self._adder.add_first(timestep, extras)
 
     def observe(

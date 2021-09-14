@@ -157,6 +157,12 @@ def BestResponseWrapper(  # noqa
     # same specifications
     system._net_spec_keys["br_network"] = list(system._net_spec_keys.values())[0]
 
+    # Update agent_net_keys with br_networks.
+    agent_net_keys = system._builder._config.agent_net_keys
+    num_br_agents = int(len(agent_net_keys.keys()) / 2)
+    for key in list(agent_net_keys.keys())[num_br_agents:]:
+        system._builder._config.agent_net_keys[key] = "br_network"
+
     # Wrap the executor with the BR hooks
     class BRExecutor(system._builder._executor_fn):  # type: ignore
         def __init__(self, *args: Any, **kwargs: Any):
