@@ -12,12 +12,10 @@ from flatland.envs.schedule_generators import sparse_schedule_generator
 from mava.systems.tf import idqn
 from mava.components.tf.modules.exploration import (
     ExponentialExplorationScheduler, 
-    LinearExplorationScheduler
 )
 from mava.utils import lp_utils
 from mava.utils.environments.flatland_utils import flatland_env_factory
 from mava.utils.loggers import logger_utils
-from mava.adders.tfrecord import TFRecordParallelTransitionAdder
 
 FLAGS = flags.FLAGS
 
@@ -36,13 +34,12 @@ def main(_: Any) -> None:
         _ (Any): args.
     """
 
-    # Flatland environment config
+    # Flatland tiny environment config
     rail_gen_cfg: Dict = {
         "max_num_cities": 3,
         "max_rails_between_cities": 2,
         "max_rails_in_city": 3,
         "grid_mode": False,
-        "seed": 42,
     }
 
     flatland_env_config: Dict = {
@@ -64,11 +61,11 @@ def main(_: Any) -> None:
     # Networks factory
     network_factory = lp_utils.partial_kwargs(
         idqn.make_default_networks, 
-        q_network_layer_sizes=(256, 256),
+        q_network_layer_sizes=(128,),
         distributional=True,
-        num_atoms=51,
         vmin=-10,
         vmax=10,
+        num_atoms=51
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -91,25 +88,24 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1, 
-        learning_rate=1e-2,
-        max_replay_size=100_000,
+        learning_rate=1e-3,
+        max_replay_size=50_000,
         checkpoint_subpath=checkpoint_dir,
         batch_size=32,
-        executor_variable_update_period=100,
-        checkpoint_minute_interval=15,
+        executor_variable_update_period=500,
+        checkpoint_minute_interval=7,
         executor_exploration_scheduler_fn= ExponentialExplorationScheduler,
         executor_exploration_scheduler_kwargs={
             "epsilon_start": 1.0,
             "epsilon_min": 0.05,
-            "epsilon_decay": 2e-5
-            # "epsilon_decay": 1 - 0.9999995,
+            "epsilon_decay": 1 - 0.9999,
         },
         distributional=True
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.
     local_resources = lp_utils.to_device(
-        program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
+        program_nodes=program.groups.keys(), nodes_on_gpu=[]
     )
 
     # Launch.
