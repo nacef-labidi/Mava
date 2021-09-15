@@ -61,7 +61,6 @@ class BCQFeedForwardExecutor(FeedForwardExecutor):
         assert threshold >= 0 and threshold <= 1
         self._threshold = threshold
 
-    @tf.function
     def _policy(
         self,
         agent: str,
@@ -96,29 +95,17 @@ class BCQFeedForwardExecutor(FeedForwardExecutor):
 
         return action
 
-    def select_action(
-        self, agent: str, observation: types.NestedArray
-    ) -> types.NestedArray:
-        """Select an action for a single agent in the system
+    @tf.function
+    def do_policies(self, observations: types.NestedArray):
+        actions = {}
+        for agent, observation in observations.items():
 
-        Args:
-            agent (str): agent id
-            observation (types.NestedArray): observation tensor received from the
-                environment.
-
-        Returns:
-            types.NestedArray: agent action
-        """
-
-        action = self._policy(
-            agent,
-            observation.observation,
-        )
-
-        # Squeeze out batch dim and convert to numpy
-        action = tf2_utils.to_numpy_squeeze(action)
-
-        return action
+            actions[agent] = self._policy(
+                agent,
+                observation.observation,
+                observation.legal_actions,
+            )
+        return actions
 
     def select_actions(
         self, observations: Dict[str, OLT]
@@ -132,11 +119,11 @@ class BCQFeedForwardExecutor(FeedForwardExecutor):
         Returns:
             Dict[str, types.NestedArray]: actions for all agents in the system.
         """
+        # Apply polisies
+        actions = self.do_policies(observations)
 
-        actions = {}
-        for agent, observation in observations.items():
-
-            actions[agent] = self.select_action(agent, observation)
+        # Return a numpy arrays with squeezed out batch dimension.
+        actions = tf2_utils.to_numpy_squeeze(actions)
 
         # Return a numpy array with squeezed out batch dimension.
         return actions
