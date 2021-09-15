@@ -63,8 +63,8 @@ def main(_: Any) -> None:
         idqn.make_default_networks, 
         q_network_layer_sizes=(128,),
         distributional=True,
-        vmin=-10,
-        vmax=10,
+        vmin=-80,
+        vmax=2,
         num_atoms=51
     )
 
