@@ -59,7 +59,7 @@ def make_default_networks(
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
         
-        # If distributional, add DiscretValueHead
+        # If distributional
         if distributional:
             q_network = snt.Sequential(
                 [

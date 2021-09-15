@@ -282,8 +282,6 @@ class IDQNTrainer(mava.Trainer):
         Args:
             inputs: input data from the data table (transitions)
         """
-        # Get info about the samples from reverb.
-        self._keys = inputs.info[0]
         # Get transitions data
         trans = mava_types.Transition(*inputs.data)
 
@@ -298,9 +296,6 @@ class IDQNTrainer(mava.Trainer):
             trans.next_extras,
         )
 
-        # Get batch_size
-        batch_size = list(actions.values())[0].shape[0]
-
         # Get feed by network type
         (net_observations, net_next_observations, net_actions, 
             net_rewards, net_discounts) = self._get_feed_by_network_type(
@@ -312,13 +307,12 @@ class IDQNTrainer(mava.Trainer):
 
             for net_key in self._unique_net_keys:
                 
-                
                 if self._distributional:
                     support = self._network_supports[net_key]
 
                     logits = self._q_networks[net_key](net_observations[net_key])
 
-                    target_logits = self._target_q_networks[net_key](net_observations[net_key])
+                    target_logits = self._target_q_networks[net_key](net_next_observations[net_key])
 
                     # trfl distributional Q-learning
                     loss, _ = trfl.categorical_dist_qlearning(
@@ -326,7 +320,7 @@ class IDQNTrainer(mava.Trainer):
                         logits,
                         net_actions[net_key],
                         net_rewards[net_key],
-                        net_discounts[net_key],
+                        self._discount * net_discounts[net_key],
                         support, 
                         target_logits
                     )

@@ -64,11 +64,11 @@ def main(_: Any) -> None:
     # Networks factory
     network_factory = lp_utils.partial_kwargs(
         idqn.make_default_networks, 
-        q_network_layer_sizes=(128,),
+        q_network_layer_sizes=(256, 256),
         distributional=True,
         num_atoms=51,
-        vmin=-400,
-        vmax=-1,
+        vmin=-10,
+        vmax=10,
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -91,11 +91,11 @@ def main(_: Any) -> None:
         network_factory=network_factory,
         logger_factory=logger_factory,
         num_executors=1, 
-        learning_rate=5e-4,
+        learning_rate=1e-2,
         max_replay_size=100_000,
         checkpoint_subpath=checkpoint_dir,
-        batch_size=256,
-        executor_variable_update_period=1000,
+        batch_size=32,
+        executor_variable_update_period=100,
         checkpoint_minute_interval=15,
         executor_exploration_scheduler_fn= ExponentialExplorationScheduler,
         executor_exploration_scheduler_kwargs={

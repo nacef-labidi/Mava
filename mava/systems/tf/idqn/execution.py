@@ -115,7 +115,7 @@ class IDQNFeedForwardExecutor(FeedForwardExecutor):
 
             logits = self._q_networks[net_key](batched_observation)
             z = tf.nn.softmax(logits, axis=-1)
-            q_values = tf.reduce_sum(support * z, axis=-1)          
+            q_values = tf.reduce_sum(z * support, axis=-1)   
         else:
             q_values = self._q_networks[net_key](batched_observation)
 

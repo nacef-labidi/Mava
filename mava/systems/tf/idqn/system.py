@@ -348,7 +348,7 @@ class IDQN:
         executor = self._builder.make_executor(
             networks=networks,
             variable_source=variable_source,
-            is_evaluator=True
+            is_evaluator=True,
         )
 
         # Maybe wrap executor in TFRecord wrapper.
