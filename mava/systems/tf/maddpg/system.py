@@ -636,7 +636,7 @@ class MADDPG:
             for trainer_id in self._trainer_networks.keys():
                 program.add_node(
                     lp.CourierNode(
-                        self.trainer, f"trainer_{trainer_id}", replay, variable_server
+                        self.trainer, trainer_id, replay, variable_server
                     )
                 )
 
