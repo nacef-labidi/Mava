@@ -63,7 +63,7 @@ def main(_: Any) -> None:
         idqn.make_default_networks, 
         q_network_layer_sizes=(128,),
         distributional=True,
-        vmin=-80,
+        vmin=-60,
         vmax=2,
         num_atoms=51
     )
@@ -98,7 +98,7 @@ def main(_: Any) -> None:
         executor_exploration_scheduler_kwargs={
             "epsilon_start": 1.0,
             "epsilon_min": 0.05,
-            "epsilon_decay": 1 - 0.9999,
+            "epsilon_decay": 1e-4,
         },
         distributional=True
     ).build()

@@ -155,17 +155,15 @@ def tfrecord_transition_dataset(
     # Process TFRecord files
     filenames = glob.glob(path + "/*.tfrecord")
     
-    # num_shards = len(filenames)
-    # file_ds = tf.data.Dataset.from_tensor_slices(filenames)
-    # file_ds = file_ds.repeat().shuffle(num_shards)
-    # example_ds = file_ds.interleave(
-    #     functools.partial(tf.data.TFRecordDataset, compression_type="GZIP"),
-    #     cycle_length=tf.data.experimental.AUTOTUNE,
-    #     block_length=5,
-    # )
-
-    example_ds = tf.data.TFRecordDataset(filenames, compression_type="GZIP")
-
+    num_shards = len(filenames)
+    file_ds = tf.data.Dataset.from_tensor_slices(filenames)
+    file_ds = file_ds.repeat().shuffle(num_shards)
+    example_ds = file_ds.interleave(
+        functools.partial(tf.data.TFRecordDataset, compression_type="GZIP"),
+        cycle_length=tf.data.experimental.AUTOTUNE,
+        block_length=5,
+    )
+    
     example_ds = example_ds.repeat().shuffle(shuffle_buffer_size)
 
     # Return TFDataset backed by TFRecord files.

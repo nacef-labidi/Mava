@@ -87,7 +87,7 @@ def main(_: Any) -> None:
         learning_rate=5e-4,
         max_replay_size=100_000,
         checkpoint_subpath=checkpoint_dir,
-        batch_size=256,
+        batch_size=32,
         executor_variable_update_period=1000,
         checkpoint_minute_interval=15,
         executor_exploration_scheduler_fn= ExponentialExplorationScheduler,

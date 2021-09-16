@@ -313,12 +313,8 @@ class IDQNTrainer(mava.Trainer):
                     logits = self._q_networks[net_key](net_observations[net_key])
                     target_logits = self._target_q_networks[net_key](net_next_observations[net_key])
 
-                    q_t_selector_logits = self._q_networks[net_key](net_next_observations[net_key])
-                    q_t_selector_z = tf.nn.softmax(q_t_selector_logits, axis=-1)
-                    q_t_selector = tf.reduce_sum(q_t_selector_z * support, axis=-1)  
-
-                    # trfl distributional double Q-learning
-                    loss, _ = trfl.categorical_dist_double_qlearning(
+                    # trfl distributional Q-learning
+                    loss, _ = trfl.categorical_dist_qlearning(
                         support,
                         logits,
                         net_actions[net_key],
@@ -326,7 +322,6 @@ class IDQNTrainer(mava.Trainer):
                         self._discount * net_discounts[net_key],
                         support, 
                         target_logits,
-                        q_t_selector
                     )
                 else:
                     q_tm1 = self._q_networks[net_key](net_observations[net_key])

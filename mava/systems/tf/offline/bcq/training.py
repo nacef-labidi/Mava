@@ -335,11 +335,12 @@ class BCQTrainer(mava.Trainer):
                 q_t_selector = self._filtered_q_value(net_key, net_next_observation[net_key])
 
                 # Compute the loss.
-                _, extra = trfl.double_qlearning(q_tm1, net_action[net_key], 
+                loss, extra = trfl.double_qlearning(q_tm1, net_action[net_key], 
                         net_reward[net_key], net_discount[net_key], q_t_value, q_t_selector)
 
-                loss = losses.huber(extra.td_error, self._huber_loss_parameter)
+                # loss = losses.huber(extra.td_error, self._huber_loss_parameter)
                 loss = tf.reduce_mean(loss, axis=[0])  # []
+                
                 network_losses[net_key]["q_network_loss"] = loss
 
         # Maybe update target network.

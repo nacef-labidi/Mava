@@ -14,6 +14,7 @@
 # limitations under the License.
 """BCQ system executor implementation."""
 
+from mava.components.tf.modules.exploration.exploration_scheduling import ConstantExplorationScheduler
 from typing import Dict, Optional
 
 import dm_env
@@ -26,6 +27,8 @@ from acme.tf import variable_utils as tf2_variable_utils
 
 from mava.systems.tf.executors import FeedForwardExecutor
 from mava.types import OLT
+from mava.components.tf.modules.exploration import ConstantExplorationScheduler
+from mava.components.tf.networks.epsilon_greedy import EpsilonGreedy
 
 
 class BCQFeedForwardExecutor(FeedForwardExecutor):
@@ -58,6 +61,15 @@ class BCQFeedForwardExecutor(FeedForwardExecutor):
         self._g_networks = g_networks
         self._agent_net_keys = agent_net_keys
 
+        # Greedy action selector
+        self._action_selector = EpsilonGreedy(
+            ConstantExplorationScheduler(
+                epsilon_start=0.0,
+                epsilon_decay=None,
+                epsilon_min=None
+            )
+        )
+
         assert threshold >= 0 and threshold <= 1
         self._threshold = threshold
 
@@ -65,6 +77,7 @@ class BCQFeedForwardExecutor(FeedForwardExecutor):
         self,
         agent: str,
         observation: types.NestedTensor,
+        legal_actions: types.NestedTensor,
     ) -> types.NestedTensor:
         """Agent specific policy function
 
@@ -79,6 +92,9 @@ class BCQFeedForwardExecutor(FeedForwardExecutor):
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         batched_observation = tf2_utils.add_batch_dim(observation)
+        # TODO remove this when we add legals to offline dataset
+        if legal_actions is not None:
+            legal_actions = tf2_utils.add_batch_dim(legal_actions)
 
         # index network either on agent type or on agent id
         net_key = self._agent_net_keys[agent]
@@ -91,6 +107,8 @@ class BCQFeedForwardExecutor(FeedForwardExecutor):
         # Filter actions based on g_network outputs.
         min_q = tf.reduce_min(q_t, axis=-1, keepdims=True)
         filtered_q = tf.where(normalized_g_t >= self._threshold, q_t, min_q)
+        # TODO use action selector when we store legal_actions in dataset
+        # action = self._action_selector(filtered_q, legallegal_actions)
         action = tf.argmax(filtered_q, axis=1)
 
         return action
