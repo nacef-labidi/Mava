@@ -32,7 +32,8 @@ from mava import specs as mava_specs
 from mava.adders.tfrecord import TFRecordParallelAdder
 from mava.components.tf.modules.exploration import (
     LinearExplorationScheduler,
-    ConstantExplorationScheduler
+    ConstantExplorationScheduler,
+    exploration_scheduling
 )
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import savers as tf2_savers
@@ -507,18 +508,18 @@ class IDQNEvaluator:
 
     def _get_system_checkpointer(self, q_networks):
         system_checkpointer = {}
-        for net_key in self._agent_net_keys.values():
+        print(set(self._agent_net_keys.values()))
+        for net_key in set(self._agent_net_keys.values()):
             # Load from trainer checkpoints
-            subdir = subdir = os.path.join("trainer", net_key)
+            subdir = os.path.join("trainer", net_key)
+            objects_to_save = {"q_network": q_networks["train"]}
             # Create checkpointer
             checkpointer = tf2_savers.Checkpointer(
                 directory=self._checkpoint_subpath,
-                objects_to_save={
-                    "q_network": q_networks[net_key],
-                },
+                objects_to_save=objects_to_save,
                 subdirectory=subdir,
-                enable_checkpointing=True,
             ).restore()
+
             # Store checkpointer
             system_checkpointer[net_key] = checkpointer
 
@@ -526,13 +527,22 @@ class IDQNEvaluator:
 
     def _make_executor(self, q_networks, action_selectors):
         # Sanity check
-        before_sum =  list(q_networks.values())[0].variables[1].numpy().sum()
+        before_sum =  q_networks["train"].variables[1].numpy().sum()
 
         # Get new network variables from checkpoint
-        system_checkpointer = self._get_system_checkpointer(q_networks)
+        # system_checkpointer = self._get_system_checkpointer(q_networks)
+        # Load from trainer checkpoints
+        subdir = os.path.join("trainer", "train")
+        objects_to_save = {"q_network": q_networks["train"]}
+        checkpointer = tf2_savers.Checkpointer(
+            directory=self._checkpoint_subpath,
+            objects_to_save=objects_to_save,
+            subdirectory=subdir,
+        )
 
         # Sanity check
-        after_sum = list(q_networks.values())[0].variables[1].numpy().sum()
+        after_sum = q_networks["train"].variables[1].numpy().sum()
+
         assert before_sum != after_sum
 
         # Make exploration scheduler

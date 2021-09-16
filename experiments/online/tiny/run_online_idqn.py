@@ -94,7 +94,7 @@ def main(_: Any) -> None:
         executor_exploration_scheduler_kwargs={
             "epsilon_start": 1.0,
             "epsilon_min": 0.05,
-            "epsilon_decay": 1 - 0.9999,
+            "epsilon_decay": 1e-4,
         },
     ).build()
 

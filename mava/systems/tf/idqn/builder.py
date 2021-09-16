@@ -246,11 +246,10 @@ class IDQNBuilder:
 
         # Q-networks
         q_networks = networks["q-networks"]
-        action_selectors = networks["action_selectors"]
+        action_selector_fns = networks["action_selectors"]
 
         # Network supports
-        if self._config.distributional:
-            network_supports = networks["supports"]
+        network_supports = networks["supports"]
 
         # Variable updator
         variable_client = None
@@ -271,14 +270,21 @@ class IDQNBuilder:
             # assigning variables before running the environment loop.
             variable_client.update_and_wait()
 
-        # Make exploration scheduler
+        # Get exploration scheduler fn and kwargs
         if is_evaluator:
-            exploration_scheduler = self._config.evaluator_exploration_scheduler_fn(
-                **self._config.evaluator_exploration_scheduler_kwargs
-            )
+            exploration_scheduler_fn = self._config.evaluator_exploration_scheduler_fn
+            exploration_scheduler_kwargs = self._config.evaluator_exploration_scheduler_kwargs
         else:
-            exploration_scheduler = self._config.executor_exploration_scheduler_fn(
-                **self._config.executor_exploration_scheduler_kwargs
+            exploration_scheduler_fn = self._config.executor_exploration_scheduler_fn
+            exploration_scheduler_kwargs = self._config.executor_exploration_scheduler_kwargs
+
+        # Pass scheduler and initialize action selectors
+        action_selectors = {}
+        for net_key, action_selector_fn in action_selector_fns.items():
+            action_selectors[net_key] = action_selector_fn(
+                exploration_scheduler_fn(
+                    **exploration_scheduler_kwargs
+                )
             )
 
         # Create the executor which coordinates the actors.
@@ -288,7 +294,6 @@ class IDQNBuilder:
             agent_net_keys=agent_net_keys,
             variable_client=variable_client,
             adder=adder,
-            exploration_scheduler=exploration_scheduler,
             network_supports=network_supports,
             distributional=self._config.distributional
         )

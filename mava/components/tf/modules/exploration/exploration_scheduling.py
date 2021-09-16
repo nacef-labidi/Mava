@@ -60,7 +60,7 @@ class ConstantExplorationScheduler(BaseExplorationScheduler):
         )
 
     def decrement_epsilon(self) -> None:
-        pass
+        return self._epsilon
 
 
 class LinearExplorationScheduler(BaseExplorationScheduler):
@@ -80,15 +80,9 @@ class LinearExplorationScheduler(BaseExplorationScheduler):
         )
 
     def decrement_epsilon(self) -> None:
-        if self._epsilon == self._epsilon_min:
-            return
+        self._epsilon = max(self._epsilon_min, self._epsilon - self._epsilon_decay)
 
-        elif self._epsilon < self._epsilon_min:
-            # Should only ever happen once.
-            self._epsilon = self._epsilon_min
-            return
-
-        self._epsilon -= self._epsilon_decay
+        return self._epsilon
 
 
 class ExponentialExplorationScheduler(BaseExplorationScheduler):
@@ -108,12 +102,8 @@ class ExponentialExplorationScheduler(BaseExplorationScheduler):
         )
 
     def decrement_epsilon(self) -> None:
-        if self._epsilon == self._epsilon_min:
-            return
+        self._epsilon = max(
+            self._epsilon_min, self._epsilon * (1 - self._epsilon_decay)
+        )
 
-        elif self._epsilon < self._epsilon_min:
-            # Should only ever happen once.
-            self._epsilon = self._epsilon_min
-            return
-
-        self._epsilon *= 1 - self._epsilon_decay
+        return self._epsilon

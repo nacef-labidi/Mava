@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from mava.components.tf.modules.exploration.exploration_scheduling import BaseExplorationScheduler
 from typing import Dict, Mapping, Optional, Sequence, Union
 from acme.tf.networks import distributional
 from numpy.core.fromnumeric import nonzero
@@ -26,7 +27,7 @@ from acme.tf.networks.distributional import DiscreteValuedHead
 
 from mava import specs as mava_specs
 from mava.components.tf import networks
-from mava.components.tf.networks import epsilon_greedy_action_selector
+from mava.components.tf.networks import EpsilonGreedy
 
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
@@ -42,14 +43,14 @@ def make_default_networks(
     # Create agent_net specs
     specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
 
-    def action_selector_fn(
-        q_values: types.NestedTensor,
-        legal_actions: types.NestedTensor,
-        epsilon: Optional[tf.Variable] = None,
-    ) -> types.NestedTensor:
-        return epsilon_greedy_action_selector(
-            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
-        )
+    # def action_selector_fn(
+    #     q_values: types.NestedTensor,
+    #     legal_actions: types.NestedTensor,
+    #     epsilon: Optional[tf.Variable] = None,
+    # ) -> types.NestedTensor:
+    #     return epsilon_greedy_action_selector(
+    #         action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
+    #     )
 
     q_networks = {}
     action_selectors = {}
@@ -73,9 +74,10 @@ def make_default_networks(
             network_supports[key] = tf.cast(tf.linspace(vmin, vmax, num_atoms), dtype='float32')
         else:
             q_network = networks.LayerNormMLP(
-                            list(q_network_layer_sizes) + [num_dimensions],
-                            activate_final=False,
-                        )
+                list(q_network_layer_sizes) + [num_dimensions],
+                activate_final=False,
+            )
+
 
         # Get observation spec for the network
         obs_spec = spec.observations.observation
@@ -84,7 +86,7 @@ def make_default_networks(
 
         # Store in dict
         q_networks[key] = q_network
-        action_selectors[key] = action_selector_fn
+        action_selectors[key] = EpsilonGreedy
 
     return {
         "q-networks": q_networks,
