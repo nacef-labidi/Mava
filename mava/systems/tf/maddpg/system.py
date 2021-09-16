@@ -287,7 +287,7 @@ class MADDPG:
         # Setup trainer_networks
         if type(trainer_networks) is not dict:
             if trainer_networks == enums.Trainer.single_trainer:
-                self._trainer_networks = {"trainer_0": unique_net_keys}
+                self._trainer_networks = {"trainer": unique_net_keys}
             elif trainer_networks == enums.Trainer.one_trainer_per_network:
                 self._trainer_networks = {
                     f"trainer_{i}": [unique_net_keys[i]]
@@ -315,9 +315,9 @@ class MADDPG:
 
         # Setup table_network_config
         table_network_config = {}
-        for t_id in range(len(self._trainer_networks.keys())):
+        for trainer_key in self._trainer_networks.keys():
             most_matches = 0
-            trainer_nets = self._trainer_networks[f"trainer_{t_id}"]
+            trainer_nets = self._trainer_networks[trainer_key]
             for sample in self._network_sampling_setup:  # type: ignore
                 matches = 0
                 for entry in sample:
@@ -325,7 +325,7 @@ class MADDPG:
                         matches += 1
                 if most_matches < matches:
                     matches = most_matches
-                    table_network_config[f"trainer_{t_id}"] = sample
+                    table_network_config[trainer_key] = sample
 
         self._table_network_config = table_network_config
         self._architecture = architecture
@@ -633,7 +633,7 @@ class MADDPG:
 
         with program.group("trainer"):
             # Add executors which pull round-robin from our variable sources.
-            for trainer_id in range(len(self._trainer_networks.keys())):
+            for trainer_id in self._trainer_networks.keys():
                 program.add_node(
                     lp.CourierNode(
                         self.trainer, f"trainer_{trainer_id}", replay, variable_server
