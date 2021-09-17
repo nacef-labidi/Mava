@@ -429,13 +429,23 @@ class MADDPG:
 
     def create_system(
         self,
+        evaluate: bool = False,
     ) -> Tuple[Dict[str, Dict[str, snt.Module]], Dict[str, Dict[str, snt.Module]]]:
         """Initialise the system variables from the network factory."""
         # Create the networks to optimize (online)
-        networks = self._network_factory(  # type: ignore
+
+        network_params = dict(
             environment_spec=self._environment_spec,
             agent_net_keys=self._agent_net_keys,
             net_spec_keys=self._net_spec_keys,
+        )
+
+        if evaluate:
+            # Remove exploration
+            network_params["sigma"] = 0.0
+
+        networks = self._network_factory(  # type: ignore
+            **network_params,
         )
 
         # Create system architecture with target networks.
@@ -542,7 +552,7 @@ class MADDPG:
         """
 
         # Create the system
-        behaviour_policy_networks, networks = self.create_system()
+        behaviour_policy_networks, networks = self.create_system(evaluate=True)
 
         # Make the environment.
         environment = self._environment_factory(evaluation=True)  # type: ignore
@@ -635,9 +645,7 @@ class MADDPG:
             # Add executors which pull round-robin from our variable sources.
             for trainer_id in self._trainer_networks.keys():
                 program.add_node(
-                    lp.CourierNode(
-                        self.trainer, trainer_id, replay, variable_server
-                    )
+                    lp.CourierNode(self.trainer, trainer_id, replay, variable_server)
                 )
 
         with program.group("evaluator"):
