@@ -88,6 +88,7 @@ def main(_: Any) -> None:
         critic_optimizer=snt.optimizers.Adam(learning_rate=1e-4),
         checkpoint_subpath=checkpoint_dir,
         max_gradient_norm=40.0,
+        samples_per_insert=None,
         trainer_fn=mad4pg.training.MAD4PGDecentralisedRecurrentTrainer,
         executor_fn=mad4pg.execution.MAD4PGRecurrentExecutor,
         batch_size=32,

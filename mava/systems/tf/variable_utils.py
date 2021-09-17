@@ -36,8 +36,8 @@ class VariableClient:
         worker_id: str,
         get_keys: List[str] = None,
         set_keys: List[str] = None,
-        get_period: int = 1,
-        set_period: int = 1,
+        get_period: int = 5,
+        set_period: int = 5,
     ):
         """Initialise the variable server."""
         self._all_keys = sort_str_num(list(variables.keys()))
@@ -108,14 +108,14 @@ class VariableClient:
 
         period_reached: bool = self._set_call_counter >= self._set_update_period
 
-        if period_reached and self.set_future is None:  # type: ignore
+        if period_reached and self._set_future is None:  # type: ignore
             # The update period has been reached and no request has been sent yet, so
             # making an asynchronous request now.
-            self.set_future = self._async_adjust()  # type: ignore
+            self._set_future = self._async_adjust()  # type: ignore
             self._set_call_counter = 0
             return
-        if self.set_future is not None and self.set_future.done():
-            self.set_future = None  # type: ignore
+        if self._set_future is not None and self._set_future.done():
+            self._set_future = None  # type: ignore
         return
 
     def add_async(self, names: List[str], vars: Dict[str, Any]) -> None:

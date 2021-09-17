@@ -155,6 +155,8 @@ def DomainRandomWrapper(  # noqa
                 # TODO (dries): Is this correct?
                 # If a network is used more in training its moving average will be
                 # updated faster. Should we use the average reward of the networks?
+
+                raise NotImplementedError("Do this async and not wait!")
                 self._variable_client.move_avg_and_wait(
                     f"moving_avg_rewards",
                     self._cum_rewards[agent],

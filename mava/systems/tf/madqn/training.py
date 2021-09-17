@@ -342,6 +342,7 @@ class MADQNTrainer(mava.Trainer):
 
         return fetches, extras
 
+    @tf.function
     def _step(self) -> Dict:
         """Trainer forward and backward passes."""
 
