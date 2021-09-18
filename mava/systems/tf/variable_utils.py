@@ -67,7 +67,7 @@ class VariableClient:
         self._executor = futures.ThreadPoolExecutor(max_workers=1)
         self._async_request = lambda: self._executor.submit(self._request)
         self._async_adjust = lambda: self._executor.submit(self._adjust)
-        self._asunc_adjust_and_request = lambda: self._executor.submit(
+        self._async_adjust_and_request = lambda: self._executor.submit(
             self._adjust_and_request
         )
         self._async_add = lambda names, vars: self._executor.submit(  # type: ignore
@@ -80,6 +80,7 @@ class VariableClient:
         self._set_future: Optional[futures.Future] = None
         self._set_get_future: Optional[futures.Future] = None
         self._add_future: Optional[futures.Future] = None
+        self._async_add_buffer = {}
 
     def _adjust_and_request(self) -> None:
         self._client.set_variables(
@@ -140,7 +141,7 @@ class VariableClient:
         if period_reached and self._set_get_future is None:  # type: ignore
             # The update period has been reached and no request has been sent yet, so
             # making an asynchronous request now.
-            self._set_get_future = self._asunc_adjust_and_request()  # type: ignore
+            self._set_get_future = self._async_adjust_and_request()  # type: ignore
             self._set_get_call_counter = 0
             return
         if self._set_get_future is not None and self._set_get_future.done():
@@ -155,12 +156,24 @@ class VariableClient:
         if self._add_future is None:
             # The update period has been reached and no request has been sent yet, so
             # making an asynchronous request now.
-            self._add_future = self._async_add(names, vars)  # type: ignore
+            if not self._async_add_buffer:
+                self._add_future = self._async_add(names, vars)  # type: ignore
+            else:
+                for name in names:
+                    self._async_add_buffer[name] += vars[name]
+                self._add_future = self._async_add(names, self._async_add_buffer)
+                self._async_add_buffer = {}
             return
         else:
-            tf.print("We got a problem!")
-            exit()
-
+            # The trainers is going to fast to keep up! Adding
+            # all the values up and only writing them when the
+            # process is ready.
+            if self._async_add_buffer:
+                for name in names:
+                    self._async_add_buffer[name] += vars[name]
+            else:
+                for name in names:
+                    self._async_add_buffer[name] = vars[name]
         return
 
     def add_and_wait(self, names: List[str], vars: Dict[str, Any]) -> None:
