@@ -613,8 +613,7 @@ class MADDPGBuilder:
                 worker_id=executor_id,
                 variables=variables,
                 get_keys=get_keys,
-                get_period=self._config.executor_variable_update_period,
-                set_period=self._config.executor_variable_update_period,
+                update_period=self._config.executor_variable_update_period,
             )
 
             # Make sure not to use a random policy after checkpoint restoration by
@@ -772,8 +771,7 @@ class MADDPGBuilder:
             get_keys=get_keys,
             set_keys=set_keys,
             worker_id=trainer_id,
-            get_period=10,
-            set_period=10,
+            update_period=10,
         )
 
         # Get all the initial variables
