@@ -65,6 +65,7 @@ class VariableClient:
         # Create a single background thread to fetch variables without necessarily
         # blocking the actor.
         self._executor = futures.ThreadPoolExecutor(max_workers=1)
+        self._async_add_buffer: Dict[str, Any] = {}
         self._async_request = lambda: self._executor.submit(self._request)
         self._async_adjust = lambda: self._executor.submit(self._adjust)
         self._async_adjust_and_request = lambda: self._executor.submit(
@@ -80,7 +81,6 @@ class VariableClient:
         self._set_future: Optional[futures.Future] = None
         self._set_get_future: Optional[futures.Future] = None
         self._add_future: Optional[futures.Future] = None
-        self._async_add_buffer = {}
 
     def _adjust_and_request(self) -> None:
         self._client.set_variables(
@@ -161,7 +161,9 @@ class VariableClient:
             else:
                 for name in names:
                     self._async_add_buffer[name] += vars[name]
-                self._add_future = self._async_add(names, self._async_add_buffer)
+                self._add_future = self._async_add(
+                    names, self._async_add_buffer
+                )  # type: ignore
                 self._async_add_buffer = {}
             return
         else:
