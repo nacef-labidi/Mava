@@ -24,11 +24,12 @@ from acme.tf import variable_utils
 from acme.utils import counting
 
 from mava import core, specs, types
-from mava.systems.tf.offline.idqn import execution, training
-from mava.wrappers.system_trainer_statistics import DetailedTrainerStatistics
 from mava.components.tf.modules.exploration.exploration_scheduling import (
     BaseExplorationScheduler,
 )
+from mava.systems.tf.offline.idqn import execution, training
+from mava.wrappers.system_trainer_statistics import DetailedTrainerStatistics
+
 
 @dataclasses.dataclass
 class OfflineIDQNConfig:
@@ -103,11 +104,10 @@ class OfflineIDQNBuilder:
 
         # Q-networks
         q_networks = networks["q-networks"]
-        action_selectors = networks["action_selectors"]
+        action_selector_fns = networks["action_selectors"]
 
         # Network supports
-        if self._config.distributional:
-            network_supports = networks["supports"]
+        network_supports = networks["supports"]
 
         # Variable updator
         variable_client = None
@@ -128,20 +128,27 @@ class OfflineIDQNBuilder:
             # assigning variables before running the environment loop.
             variable_client.update_and_wait()
 
-        # Make exploration scheduler
-        exploration_scheduler = self._config.evaluator_exploration_scheduler_fn(
-            **self._config.evaluator_exploration_scheduler_kwargs
+        # Exploration scheduler
+        exploration_scheduler_fn = self._config.evaluator_exploration_scheduler_fn
+        exploration_scheduler_kwargs = (
+            self._config.evaluator_exploration_scheduler_kwargs
         )
+
+        # Pass scheduler and initialize action selectors
+        action_selectors = {}
+        for net_key, action_selector_fn in action_selector_fns.items():
+            action_selectors[net_key] = action_selector_fn(
+                exploration_scheduler_fn(**exploration_scheduler_kwargs)
+            )
 
         # Create the executor which coordinates the actors.
         return self._executor_fn(
             q_networks=q_networks,
-            action_selectors=action_selectors,
             agent_net_keys=agent_net_keys,
+            action_selectors=action_selectors,
             variable_client=variable_client,
-            exploration_scheduler=exploration_scheduler,
             network_supports=network_supports,
-            distributional=self._config.distributional
+            distributional=self._config.distributional,
         )
 
     def make_trainer(
@@ -172,7 +179,8 @@ class OfflineIDQNBuilder:
         # Get network supports
         if self._config.distributional:
             network_supports = networks["supports"]
-        else: network_supports = None
+        else:
+            network_supports = None
 
         # Get agent info
         agents = self._config.environment_spec.get_agent_ids()
@@ -193,7 +201,7 @@ class OfflineIDQNBuilder:
             checkpoint_subpath=self._config.checkpoint_subpath,
             checkpoint_minute_interval=self._config.checkpoint_minute_interval,
             network_supports=network_supports,
-            distributional=self._config.distributional
+            distributional=self._config.distributional,
         )
 
         trainer = DetailedTrainerStatistics(

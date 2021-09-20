@@ -27,7 +27,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """IDQN system executor implementation."""
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 import dm_env
 import numpy as np
@@ -40,13 +40,13 @@ from acme.tf.networks.distributions import DiscreteValuedDistribution
 
 from mava import adders
 from mava.components.tf.modules import exploration
+from mava.components.tf.modules.exploration import BaseExplorationScheduler
 from mava.systems.tf.executors import FeedForwardExecutor
 from mava.systems.tf.idqn.training import IDQNTrainer
 from mava.types import OLT
-from mava.components.tf.modules.exploration import BaseExplorationScheduler
 
 
-class IDQNFeedForwardExecutor(FeedForwardExecutor):
+class OfflineIDQNFeedForwardExecutor(FeedForwardExecutor):
     """A feed-forward executor.
 
     An executor based on a feed-forward policy for each agent in the system.
@@ -57,10 +57,9 @@ class IDQNFeedForwardExecutor(FeedForwardExecutor):
         q_networks: Dict[str, snt.Module],
         action_selectors: Dict[str, snt.Module],
         agent_net_keys: Dict[str, str],
-        exploration_scheduler: BaseExplorationScheduler, 
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
         distributional: bool = False,
-        network_supports: Dict = None
+        network_supports: Dict = None,
     ):
         """Initialise the system executor
 
@@ -82,18 +81,49 @@ class IDQNFeedForwardExecutor(FeedForwardExecutor):
         self._q_networks = q_networks
         self._action_selectors = action_selectors
         self._agent_net_keys = agent_net_keys
-        self._exploration_scheduler = exploration_scheduler
 
         # Distributional Q-learning stuff
         self._distributional = distributional
         self._network_supports = network_supports
 
+    def _get_epsilon(self) -> Union[float, np.ndarray]:
+        """Return epsilon.
+
+        Returns:
+            epsilon values.
+        """
+        data = list(
+            {
+                action_selector.get_epsilon()
+                for action_selector in self._action_selectors.values()
+            }
+        )
+        if len(data) == 1:
+            return data[0]
+        else:
+            return np.array(list(data))
+
+    def _decrement_epsilon(self) -> None:
+        """Decrements epsilon in action selectors."""
+        {
+            action_selector.decrement_epsilon()
+            for action_selector in self._action_selectors.values()
+        }
+
+    def get_stats(self) -> Dict:
+        """Return extra stats to log.
+        Returns:
+            epsilon information.
+        """
+        return {
+            f"{net_key}_epsilon": action_selector.get_epsilon()
+            for net_key, action_selector in self._action_selectors.items()
+        }
+
     def _policy(
         self,
         agent: str,
         observation: types.NestedTensor,
-        legal_actions: types.NestedTensor,
-        epsilon: tf.Tensor,
     ) -> types.NestedTensor:
         """Agent specific policy function
 
@@ -103,9 +133,6 @@ class IDQNFeedForwardExecutor(FeedForwardExecutor):
                 environment.
             legal_actions (types.NestedTensor): actions allowed to be taken at the
                 current observation.
-            epsilon (tf.Tensor): value for epsilon greedy action selection.
-            fingerprint (Optional[tf.Tensor], optional): policy fingerprints. Defaults
-                to None.
 
         Returns:
             types.NestedTensor: agent action
@@ -113,7 +140,6 @@ class IDQNFeedForwardExecutor(FeedForwardExecutor):
 
         # Add a dummy batch dimension and as a side effect convert numpy to TF.
         batched_observation = tf2_utils.add_batch_dim(observation)
-        batched_legals = tf2_utils.add_batch_dim(legal_actions)
 
         # Get network ID
         net_key = self._agent_net_keys[agent]
@@ -125,27 +151,27 @@ class IDQNFeedForwardExecutor(FeedForwardExecutor):
 
             logits = self._q_networks[net_key](batched_observation)
             z = tf.nn.softmax(logits, axis=-1)
-            q_values = tf.reduce_sum(z * support, axis=-1)   
+            q_values = tf.reduce_sum(z * support, axis=-1)
         else:
             q_values = self._q_networks[net_key](batched_observation)
 
         # Select legal action
-        action = self._action_selectors[net_key](
-            q_values, batched_legals, epsilon=epsilon
-        )
+        # action = self._action_selectors[net_key](
+        #     q_values, None
+        # )
+
+        action = tf.argmax(q_values, axis=1)
 
         return action
 
     @tf.function
-    def do_policies(self, observations: types.NestedArray, epsilon: float):
+    def do_policies(self, observations: types.NestedArray):
         actions = {}
         for agent, observation in observations.items():
 
             actions[agent] = self._policy(
                 agent,
                 observation.observation,
-                observation.legal_actions,
-                epsilon,
             )
         return actions
 
@@ -161,18 +187,14 @@ class IDQNFeedForwardExecutor(FeedForwardExecutor):
         Returns:
             Dict[str, types.NestedArray]: actions for all agents in the system.
         """
-        # Get and decrement epsilon
-        self._exploration_scheduler.decrement_epsilon()
-        epsilon = tf.convert_to_tensor(
-            self._exploration_scheduler.get_epsilon(),
-            dtype='float32'
-        )
-
         # Apply polisies
-        actions = self.do_policies(observations, epsilon)
+        actions = self.do_policies(observations)
 
         # Return a numpy arrays with squeezed out batch dimension.
         actions = tf2_utils.to_numpy_squeeze(actions)
+
+        # Decrement epsilon
+        self._decrement_epsilon()
 
         return actions
 
@@ -217,13 +239,3 @@ class IDQNFeedForwardExecutor(FeedForwardExecutor):
         """
         if self._variable_client:
             self._variable_client.update(wait)
-
-    def get_stats(self) -> Dict:
-        """Return extra stats to log.
-
-        Returns:
-            epsilon information.
-        """
-        return {
-            "epsilon": self._exploration_scheduler.get_epsilon()
-        }

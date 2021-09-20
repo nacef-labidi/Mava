@@ -13,43 +13,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import Dict, Mapping, Optional, Sequence, Union
-from acme.tf.networks import distributional
-from numpy.core.fromnumeric import nonzero
 
-import tensorflow as tf
-from tensorflow.keras.layers import Input, Dense, Reshape, Softmax
 import sonnet as snt
+import tensorflow as tf
 from acme import types
 from acme.tf import utils as tf2_utils
+from acme.tf.networks import distributional
 from acme.tf.networks.distributional import DiscreteValuedHead
-
+from numpy.core.fromnumeric import nonzero
+from tensorflow.keras.layers import Dense, Input, Reshape, Softmax
 
 from mava import specs as mava_specs
 from mava.components.tf import networks
-from mava.components.tf.networks import epsilon_greedy_action_selector
+from mava.components.tf.modules.exploration.exploration_scheduling import (
+    BaseExplorationScheduler,
+)
+from mava.components.tf.networks import EpsilonGreedy
+
 
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
-    q_network_layer_sizes: Sequence = (256,256),
+    q_network_layer_sizes: Sequence = (256, 256),
     distributional: bool = False,
     num_atoms: int = 51,
     vmin: int = -100,
-    vmax: int = 100
+    vmax: int = 100,
 ) -> Mapping[str, types.TensorTransformation]:
-    # Get env spec  
+    # Get env spec
     specs = environment_spec.get_agent_specs()
     # Create agent_net specs
     specs = {agent_net_keys[key]: specs[key] for key in specs.keys()}
 
-    def action_selector_fn(
-        q_values: types.NestedTensor,
-        legal_actions: types.NestedTensor,
-        epsilon: Optional[tf.Variable] = None,
-    ) -> types.NestedTensor:
-        return epsilon_greedy_action_selector(
-            action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
-        )
+    # def action_selector_fn(
+    #     q_values: types.NestedTensor,
+    #     legal_actions: types.NestedTensor,
+    #     epsilon: Optional[tf.Variable] = None,
+    # ) -> types.NestedTensor:
+    #     return epsilon_greedy_action_selector(
+    #         action_values=q_values, legal_actions_mask=legal_actions, epsilon=epsilon
+    #     )
 
     q_networks = {}
     action_selectors = {}
@@ -58,24 +61,26 @@ def make_default_networks(
 
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
-        
+
         # If distributional
         if distributional:
             q_network = snt.Sequential(
                 [
                     networks.LayerNormMLP(
-                            list(q_network_layer_sizes) + [num_atoms * num_dimensions],
-                            activate_final=False,
+                        list(q_network_layer_sizes) + [num_atoms * num_dimensions],
+                        activate_final=False,
                     ),
-                    tf.keras.layers.Reshape((num_dimensions, num_atoms))
+                    tf.keras.layers.Reshape((num_dimensions, num_atoms)),
                 ]
             )
-            network_supports[key] = tf.cast(tf.linspace(vmin, vmax, num_atoms), dtype='float32')
+            network_supports[key] = tf.cast(
+                tf.linspace(vmin, vmax, num_atoms), dtype="float32"
+            )
         else:
             q_network = networks.LayerNormMLP(
-                            list(q_network_layer_sizes) + [num_dimensions],
-                            activate_final=False,
-                        )
+                list(q_network_layer_sizes) + [num_dimensions],
+                activate_final=False,
+            )
 
         # Get observation spec for the network
         obs_spec = spec.observations.observation
@@ -84,10 +89,10 @@ def make_default_networks(
 
         # Store in dict
         q_networks[key] = q_network
-        action_selectors[key] = action_selector_fn
+        action_selectors[key] = EpsilonGreedy
 
     return {
         "q-networks": q_networks,
         "action_selectors": action_selectors,
-        "supports": network_supports
+        "supports": network_supports,
     }

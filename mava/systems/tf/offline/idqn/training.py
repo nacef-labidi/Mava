@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Independent DQN system trainer implementation."""
-import os
 import copy
+import os
 import time
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -25,9 +25,9 @@ import tensorflow as tf
 import trfl
 from acme.tf import losses
 from acme.tf import utils as tf2_utils
+from acme.tf.networks.distributions import DiscreteValuedDistribution
 from acme.types import NestedArray
 from acme.utils import counting, loggers
-from acme.tf.networks.distributions import DiscreteValuedDistribution
 
 import mava
 from mava import types as mava_types
@@ -40,7 +40,7 @@ train_utils.set_growing_gpu_memory()
 
 class OfflineIDQNTrainer(mava.Trainer):
     """IDQN trainer.
-    
+
     This is the trainer component of a IDQN system. IE it takes a dataset as input
     and implements update functionality to learn from this dataset.
     """
@@ -61,7 +61,7 @@ class OfflineIDQNTrainer(mava.Trainer):
         checkpoint_minute_interval: int = 15,
         checkpoint_subpath: str = "~/mava/",
         distributional: bool = False,
-        network_supports: Dict = None
+        network_supports: Dict = None,
     ):
         """Independet DQN Trainer.
 
@@ -178,12 +178,7 @@ class OfflineIDQNTrainer(mava.Trainer):
         self._num_steps.assign_add(1)
 
     def _get_feed_by_network_type(
-        self, 
-        observations, 
-        next_observations, 
-        actions, 
-        rewards, 
-        discounts
+        self, observations, next_observations, actions, rewards, discounts
     ) -> Tuple:
         # Initalize dicts
         net_observations = {}
@@ -199,11 +194,7 @@ class OfflineIDQNTrainer(mava.Trainer):
                 net_observations[net_key] = observations[agent].observation
             else:
                 net_observations[net_key] = tf.concat(
-                    [
-                        net_observations[net_key],
-                        observations[agent].observation
-                    ],
-                    axis=0
+                    [net_observations[net_key], observations[agent].observation], axis=0
                 )
 
             # Concat next observations
@@ -213,9 +204,9 @@ class OfflineIDQNTrainer(mava.Trainer):
                 net_next_observations[net_key] = tf.concat(
                     [
                         net_next_observations[net_key],
-                        next_observations[agent].observation
+                        next_observations[agent].observation,
                     ],
-                    axis=0
+                    axis=0,
                 )
 
             # Concat actions
@@ -223,11 +214,7 @@ class OfflineIDQNTrainer(mava.Trainer):
                 net_actions[net_key] = actions[agent]
             else:
                 net_actions[net_key] = tf.concat(
-                    [
-                       net_actions[net_key],
-                        actions[agent]
-                    ],
-                    axis=0
+                    [net_actions[net_key], actions[agent]], axis=0
                 )
 
             # Concat rewards
@@ -235,11 +222,7 @@ class OfflineIDQNTrainer(mava.Trainer):
                 net_rewards[net_key] = rewards[agent]
             else:
                 net_rewards[net_key] = tf.concat(
-                    [
-                       net_rewards[net_key],
-                        rewards[agent]
-                    ],
-                    axis=0
+                    [net_rewards[net_key], rewards[agent]], axis=0
                 )
 
             # Concat discounts
@@ -247,17 +230,18 @@ class OfflineIDQNTrainer(mava.Trainer):
                 net_discounts[net_key] = discounts[agent]
             else:
                 net_discounts[net_key] = tf.concat(
-                    [
-                       net_discounts[net_key],
-                        discounts[agent]
-                    ],
-                    axis=0
+                    [net_discounts[net_key], discounts[agent]], axis=0
                 )
 
-        return (net_observations, net_next_observations, 
-            net_actions, net_rewards, net_discounts)
+        return (
+            net_observations,
+            net_next_observations,
+            net_actions,
+            net_rewards,
+            net_discounts,
+        )
 
-    @tf.function
+    # @tf.function
     def _step(self) -> Dict:
         """Trainer forward and backward passes."""
 
@@ -297,41 +281,46 @@ class OfflineIDQNTrainer(mava.Trainer):
         )
 
         # Get feed by network type
-        (net_observations, net_next_observations, net_actions, 
-            net_rewards, net_discounts) = self._get_feed_by_network_type(
-                observations, next_observations, actions, rewards, discounts
-            )
+        (
+            net_observations,
+            net_next_observations,
+            net_actions,
+            net_rewards,
+            net_discounts,
+        ) = self._get_feed_by_network_type(
+            observations, next_observations, actions, rewards, discounts
+        )
 
         self._q_network_losses: Dict[str, NestedArray] = {}
         with tf.GradientTape(persistent=True) as tape:
 
             for net_key in self._unique_net_keys:
-                
+
                 if self._distributional:
                     support = self._network_supports[net_key]
-
                     logits = self._q_networks[net_key](net_observations[net_key])
-                    target_logits = self._target_q_networks[net_key](net_next_observations[net_key])
+                    target_logits = self._target_q_networks[net_key](
+                        net_next_observations[net_key]
+                    )
 
-                    q_t_selector_logits = self._q_networks[net_key](net_next_observations[net_key])
-                    q_t_selector_z = tf.nn.softmax(q_t_selector_logits, axis=-1)
-                    q_t_selector = tf.reduce_sum(q_t_selector_z * support, axis=-1)  
-
-                    # trfl distributional double Q-learning
-                    loss, _ = trfl.categorical_dist_double_qlearning(
+                    # trfl distributional Q-learning
+                    loss, _ = trfl.categorical_dist_qlearning(
                         support,
                         logits,
                         net_actions[net_key],
                         net_rewards[net_key],
                         self._discount * net_discounts[net_key],
-                        support, 
+                        support,
                         target_logits,
-                        q_t_selector
                     )
                 else:
                     q_tm1 = self._q_networks[net_key](net_observations[net_key])
-                    q_t_value = self._target_q_networks[net_key](net_next_observations[net_key])
-                    q_t_selector = self._q_networks[net_key](net_next_observations[net_key])
+                    q_t_value = self._target_q_networks[net_key](
+                        net_next_observations[net_key]
+                    )
+                    q_t_selector = self._q_networks[net_key](
+                        net_next_observations[net_key]
+                    )
 
                     # trfl double Q-learning
                     loss, _ = trfl.double_qlearning(

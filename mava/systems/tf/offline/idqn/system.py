@@ -28,6 +28,10 @@ from acme.utils import counting
 import mava
 from mava import core
 from mava import specs as mava_specs
+from mava.components.tf.modules.exploration import (
+    BaseExplorationScheduler,
+    ConstantExplorationScheduler,
+)
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import executors
 from mava.systems.tf import savers as tf2_savers
@@ -35,10 +39,6 @@ from mava.systems.tf.offline.idqn import builder, execution, training
 from mava.utils import lp_utils
 from mava.utils.loggers import MavaLogger, logger_utils
 from mava.wrappers import DetailedPerAgentStatistics
-from mava.components.tf.modules.exploration import (
-    BaseExplorationScheduler,
-    ConstantExplorationScheduler
-)
 
 
 class OfflineIDQN:
@@ -70,15 +70,17 @@ class OfflineIDQN:
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
-        evaluator_exploration_scheduler_fn: Type[BaseExplorationScheduler] = ConstantExplorationScheduler,
+        evaluator_exploration_scheduler_fn: Type[
+            BaseExplorationScheduler
+        ] = ConstantExplorationScheduler,
         evaluator_exploration_scheduler_kwargs: Dict = {
             "epsilon_start": 0.0,
             "epsilon_min": None,
             "epsilon_decay": None,
         },
-        distributional: bool = False
+        distributional: bool = False,
     ):
-       # Make environment spec
+        # Make environment spec
         self._environment_spec = mava_specs.MAEnvironmentSpec(
             environment_factory(evaluation=False)  # type:ignore
         )
@@ -103,8 +105,8 @@ class OfflineIDQN:
         if not agent_net_keys:
             agents = self._environment_spec.get_agent_ids()
             self._agent_net_keys = {
-                agent: agent.split("_")[0] if shared_weights else
-                    agent for agent in agents
+                agent: agent.split("_")[0] if shared_weights else agent
+                for agent in agents
             }
 
         self._max_executor_steps = max_executor_steps
@@ -135,7 +137,7 @@ class OfflineIDQN:
                 checkpoint=checkpoint,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
-                distributional=distributional
+                distributional=distributional,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -238,7 +240,6 @@ class OfflineIDQN:
         executor = self._builder.make_executor(
             networks=networks,
             variable_source=variable_source,
-            is_evaluator=True,
         )
 
         # Make the environment.
