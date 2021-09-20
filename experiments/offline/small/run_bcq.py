@@ -97,11 +97,12 @@ def main(_: Any) -> None:
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        learning_rate=1e-3,
+        learning_rate=1e-4,
         threshold=0.5,
         checkpoint_subpath=checkpoint_dir,
         batch_size=32,
         executor_variable_update_period=100,
+        target_update_period=2500,
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.
@@ -116,6 +117,7 @@ def main(_: Any) -> None:
         terminal="current_terminal",
         local_resources=local_resources,
     )
+
 
 if __name__ == "__main__":
     app.run(main)
