@@ -14,8 +14,8 @@
 # limitations under the License.
 
 """IDQN system implementation."""
-import os
 import functools
+import os
 from typing import Any, Callable, Dict, Optional, Type
 
 import acme
@@ -31,9 +31,9 @@ from mava import core
 from mava import specs as mava_specs
 from mava.adders.tfrecord import TFRecordParallelAdder
 from mava.components.tf.modules.exploration import (
-    LinearExplorationScheduler,
     ConstantExplorationScheduler,
-    exploration_scheduling
+    LinearExplorationScheduler,
+    exploration_scheduling,
 )
 from mava.environment_loop import ParallelEnvironmentLoop
 from mava.systems.tf import savers as tf2_savers
@@ -120,8 +120,8 @@ class IDQN:
         if not agent_net_keys:
             agents = self._environment_spec.get_agent_ids()
             self._agent_net_keys = {
-                agent: agent.split("_")[0] if shared_weights else
-                    agent for agent in agents
+                agent: agent.split("_")[0] if shared_weights else agent
+                for agent in agents
             }
 
         self._num_exectors = num_executors
@@ -169,7 +169,7 @@ class IDQN:
                 checkpoint=checkpoint,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
-                distributional=distributional
+                distributional=distributional,
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -284,7 +284,6 @@ class IDQN:
             environment_spec=self._environment_spec,
             agent_net_keys=self._agent_net_keys,
         )
-
 
         # Create the executor.
         executor = self._builder.make_executor(
@@ -453,7 +452,7 @@ class IDQNEvaluator:
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         eval_loop_fn_kwargs: Dict = {},
         tfrecord_adder_factory: Optional[Type[TFRecordParallelAdder]] = None,
-        tfrecord_adder_kwargs: Dict = {}
+        tfrecord_adder_kwargs: Dict = {},
     ):
         # Make environment spec
         self._environment_spec = mava_specs.MAEnvironmentSpec(
@@ -478,18 +477,20 @@ class IDQNEvaluator:
         self._checkpoint_subpath = checkpoint_subpath
         self._logger_config = logger_config
         self._evaluator_exploration_scheduler_fn = evaluator_exploration_scheduler_fn
-        self._evaluator_exploration_scheduler_kwargs = evaluator_exploration_scheduler_kwargs
-        self._executor_fn=executor_fn
+        self._evaluator_exploration_scheduler_kwargs = (
+            evaluator_exploration_scheduler_kwargs
+        )
+        self._executor_fn = executor_fn
         self._eval_loop_fn = eval_loop_fn
         self._eval_loop_fn_kwargs = eval_loop_fn_kwargs
-        
+
         # Setup agent networks
         self._agent_net_keys = agent_net_keys
         if not agent_net_keys:
             agents = self._environment_spec.get_agent_ids()
             self._agent_net_keys = {
-                agent: agent.split("_")[0] if shared_weights else
-                    agent for agent in agents
+                agent: agent.split("_")[0] if shared_weights else agent
+                for agent in agents
             }
 
         # Maybe instantiate TFRecordAdder.
@@ -525,9 +526,9 @@ class IDQNEvaluator:
 
         return system_checkpointer
 
-    def _make_executor(self, q_networks, action_selectors):
+    def _make_executor(self, q_networks, action_selector_fns):
         # Sanity check
-        before_sum =  q_networks["train"].variables[1].numpy().sum()
+        before_sum = q_networks["train"].variables[1].numpy().sum()
 
         # Get new network variables from checkpoint
         # system_checkpointer = self._get_system_checkpointer(q_networks)
@@ -545,17 +546,20 @@ class IDQNEvaluator:
 
         assert before_sum != after_sum
 
-        # Make exploration scheduler
-        exploration_scheduler = self._evaluator_exploration_scheduler_fn(
-            **self._evaluator_exploration_scheduler_kwargs
-        )
+        # Pass scheduler and initialize action selectors
+        action_selectors = {}
+        for net_key, action_selector_fn in action_selector_fns.items():
+            action_selectors[net_key] = action_selector_fn(
+                self._evaluator_exploration_scheduler_fn(
+                    **self._evaluator_exploration_scheduler_kwargs
+                )
+            )
 
         # Create executor
         executor = self._executor_fn(
             q_networks=q_networks,
             action_selectors=action_selectors,
             agent_net_keys=self._agent_net_keys,
-            exploration_scheduler=exploration_scheduler
         )
 
         return executor
@@ -586,7 +590,7 @@ class IDQNEvaluator:
         # Create the agent.
         executor = self._make_executor(
             q_networks=networks["q-networks"],
-            action_selectors=networks["action_selectors"],
+            action_selector_fns=networks["action_selectors"],
         )
 
         # Maybe wrap executor in TFRecord wrapper.
@@ -640,6 +644,3 @@ class IDQNEvaluator:
             program.add_node(lp.CourierNode(self.evaluator, counter))
 
         return program
-
-        
-

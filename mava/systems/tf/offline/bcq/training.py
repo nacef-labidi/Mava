@@ -26,9 +26,9 @@ import reverb
 import sonnet as snt
 import tensorflow as tf
 import trfl
+from acme.tf import losses
 from acme.tf import utils as tf2_utils
 from acme.types import NestedArray
-from acme.tf import losses
 from acme.utils import counting, loggers
 
 import mava
@@ -57,7 +57,7 @@ class BCQTrainer(mava.Trainer):
         agent_net_keys: Dict[str, str],
         learning_rate: float = 1e-3,
         discount: float = 0.99,
-        huber_loss_parameter: float = 1.,
+        huber_loss_parameter: float = 1.0,
         target_update_period: int = 100,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
@@ -75,7 +75,7 @@ class BCQTrainer(mava.Trainer):
             g_networks: behavior cloning networks being optimized.
             dataset: training dataset.
             learning_rate: learning rate of the network optimizers.
-            agent_net_keys: specifies what network each agent uses. 
+            agent_net_keys: specifies what network each agent uses.
                 Defaults to {}.
             discount: agent discount. Defaults to 0.99.
             target_update_period: learner steps between target network update.
@@ -83,7 +83,7 @@ class BCQTrainer(mava.Trainer):
             max_gradient_norm: maximum allowed norm for gradients
                 before clipping is applied. Defaults to None.
             counter: step counter object. Defaults to None.
-            logger: logger object for logging trainer statistics. 
+            logger: logger object for logging trainer statistics.
                 Defaults to None.
             checkpoint: whether to checkpoint networks. Defaults to True.
             checkpoint_subpath: subdirectory for storing checkpoints.
@@ -141,7 +141,7 @@ class BCQTrainer(mava.Trainer):
         # Expose the variables.
         self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
             "q_network": {},
-            "g_network": {}
+            "g_network": {},
         }
         for agent_key in self.unique_net_keys:
             q_network_to_expose = self._q_networks[agent_key]
@@ -179,12 +179,7 @@ class BCQTrainer(mava.Trainer):
         self._timestamp: Optional[float] = None
 
     def _get_feed_by_network_type(
-        self, 
-        observations, 
-        next_observations, 
-        actions, 
-        rewards, 
-        discounts
+        self, observations, next_observations, actions, rewards, discounts
     ) -> Tuple:
         # Initalize dicts
         net_observation = {}
@@ -200,11 +195,8 @@ class BCQTrainer(mava.Trainer):
                 net_observation[agent_type] = observations[agent].observation
             else:
                 net_observation[agent_type] = tf.concat(
-                    [
-                        net_observation[agent_type],
-                        observations[agent].observation
-                    ],
-                    axis=0
+                    [net_observation[agent_type], observations[agent].observation],
+                    axis=0,
                 )
 
             # Concat next observations
@@ -214,9 +206,9 @@ class BCQTrainer(mava.Trainer):
                 net_next_observation[agent_type] = tf.concat(
                     [
                         net_next_observation[agent_type],
-                        next_observations[agent].observation
+                        next_observations[agent].observation,
                     ],
-                    axis=0
+                    axis=0,
                 )
 
             # Concat actions
@@ -224,11 +216,7 @@ class BCQTrainer(mava.Trainer):
                 net_action[agent_type] = actions[agent]
             else:
                 net_action[agent_type] = tf.concat(
-                    [
-                       net_action[agent_type],
-                        actions[agent]
-                    ],
-                    axis=0
+                    [net_action[agent_type], actions[agent]], axis=0
                 )
 
             # Concat rewards
@@ -236,11 +224,7 @@ class BCQTrainer(mava.Trainer):
                 net_reward[agent_type] = rewards[agent]
             else:
                 net_reward[agent_type] = tf.concat(
-                    [
-                       net_reward[agent_type],
-                        rewards[agent]
-                    ],
-                    axis=0
+                    [net_reward[agent_type], rewards[agent]], axis=0
                 )
 
             # Concat discounts
@@ -248,15 +232,16 @@ class BCQTrainer(mava.Trainer):
                 net_discount[agent_type] = discounts[agent]
             else:
                 net_discount[agent_type] = tf.concat(
-                    [
-                       net_discount[agent_type],
-                        discounts[agent]
-                    ],
-                    axis=0
+                    [net_discount[agent_type], discounts[agent]], axis=0
                 )
 
-        return (net_observation, net_next_observation, 
-            net_action, net_reward, net_discount)
+        return (
+            net_observation,
+            net_next_observation,
+            net_action,
+            net_reward,
+            net_discount,
+        )
 
     def _filtered_q_value(self, net_key, observation):
         q_t = self._q_networks[net_key](observation)
@@ -303,24 +288,22 @@ class BCQTrainer(mava.Trainer):
         )
 
         # Dicts to store per network type
-        (net_observation, 
-        net_next_observation, 
-        net_action, 
-        net_reward, 
-        net_discount) = self._get_feed_by_network_type(
-            observations, 
-            next_observations,
-            actions,
-            rewards,
-            discounts
+        (
+            net_observation,
+            net_next_observation,
+            net_action,
+            net_reward,
+            net_discount,
+        ) = self._get_feed_by_network_type(
+            observations, next_observations, actions, rewards, discounts
         )
 
         network_losses = {}
         with tf.GradientTape(persistent=True) as tape:
-            
+
             for net_key in self.unique_net_keys:
                 network_losses[net_key] = {}
-                
+
                 # Evaluate g-networks
                 logits = self._g_networks[net_key](net_observation[net_key])
                 cce = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
@@ -331,16 +314,26 @@ class BCQTrainer(mava.Trainer):
 
                 # Evaluate q-networks
                 q_tm1 = self._q_networks[net_key](net_observation[net_key])
-                q_t_value = self._target_q_networks[net_key](net_next_observation[net_key])
-                q_t_selector = self._filtered_q_value(net_key, net_next_observation[net_key])
+                q_t_value = self._target_q_networks[net_key](
+                    net_next_observation[net_key]
+                )
+                q_t_selector = self._filtered_q_value(
+                    net_key, net_next_observation[net_key]
+                )
 
                 # Compute the loss.
-                loss, extra = trfl.double_qlearning(q_tm1, net_action[net_key], 
-                        net_reward[net_key], net_discount[net_key], q_t_value, q_t_selector)
+                loss, extra = trfl.double_qlearning(
+                    q_tm1,
+                    net_action[net_key],
+                    net_reward[net_key],
+                    self._discount * net_discount[net_key],
+                    q_t_value,
+                    q_t_selector,
+                )
 
                 # loss = losses.huber(extra.td_error, self._huber_loss_parameter)
-                loss = tf.reduce_mean(loss, axis=[0])  # []
-                
+                loss = tf.reduce_mean(loss)  # []
+
                 network_losses[net_key]["q_network_loss"] = loss
 
         # Maybe update target network.
@@ -363,13 +356,19 @@ class BCQTrainer(mava.Trainer):
 
             # Compute gradients
             q_gradients = tape.gradient(
-                network_losses[net_key]["q_network_loss"], q_network_variables)
+                network_losses[net_key]["q_network_loss"], q_network_variables
+            )
             g_gradients = tape.gradient(
-                network_losses[net_key]["g_network_loss"], g_network_variables)
+                network_losses[net_key]["g_network_loss"], g_network_variables
+            )
 
             # Clip gradients.
-            q_gradients = tf.clip_by_global_norm(q_gradients, self._max_gradient_norm)[0]
-            g_gradients = tf.clip_by_global_norm(g_gradients, self._max_gradient_norm)[0]
+            q_gradients = tf.clip_by_global_norm(q_gradients, self._max_gradient_norm)[
+                0
+            ]
+            g_gradients = tf.clip_by_global_norm(g_gradients, self._max_gradient_norm)[
+                0
+            ]
 
             # Apply gradients.
             self._q_optimizers[net_key].apply(q_gradients, q_network_variables)

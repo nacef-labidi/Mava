@@ -1,5 +1,5 @@
-import os
 import functools
+import os
 from datetime import datetime
 from typing import Any, Dict
 
@@ -10,21 +10,20 @@ from flatland.envs.predictions import ShortestPathPredictorForRailEnv
 from flatland.envs.rail_generators import sparse_rail_generator
 from flatland.envs.schedule_generators import sparse_schedule_generator
 
+from mava.adders.tfrecord import TFRecordParallelTransitionAdder
+from mava.components.tf.modules.exploration import ConstantExplorationScheduler
 from mava.systems.tf import idqn
 from mava.utils import lp_utils
-from mava.components.tf.modules.exploration import (
-    ConstantExplorationScheduler, 
-)
 from mava.utils.environments.flatland_utils import flatland_env_factory
 from mava.utils.loggers import logger_utils
-from mava.adders.tfrecord import TFRecordParallelTransitionAdder
 
 mava_id = str(datetime.now())
 base_dir = "logs"
 log_dir = os.path.join(base_dir, mava_id)
 
 # Checkpointer appends "checkpoints" to checkpoint_dir
-checkpoint_dir = "expriments/logs/small/online_idqn"
+checkpoint_dir = "logs/online_idqn"
+
 
 def main(_: Any) -> None:
     """Main function for the example.
@@ -82,7 +81,7 @@ def main(_: Any) -> None:
         logger_factory=logger_factory,
         evaluator_exploration_scheduler_fn=ConstantExplorationScheduler,
         evaluator_exploration_scheduler_kwargs={
-            "epsilon_start": 0.05,
+            "epsilon_start": 0.001,
             "epsilon_min": None,
             "epsilon_decay": None,
         },
@@ -102,6 +101,7 @@ def main(_: Any) -> None:
         terminal="current_terminal",
         local_resources=local_resources,
     )
+
 
 if __name__ == "__main__":
     app.run(main)
