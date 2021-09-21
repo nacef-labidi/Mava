@@ -3,19 +3,19 @@ from datetime import datetime
 from typing import Any, Dict
 
 import launchpad as lp
+import sonnet as snt
 from absl import app, flags
 from flatland.envs.observations import TreeObsForRailEnv
 from flatland.envs.predictions import ShortestPathPredictorForRailEnv
 from flatland.envs.rail_generators import sparse_rail_generator
 from flatland.envs.schedule_generators import sparse_schedule_generator
 
-from mava.systems.tf import idqn
-from mava.components.tf.modules.exploration import (
-    ExponentialExplorationScheduler, 
-)
+from mava.specs import MAEnvironmentSpec
+from mava.systems.tf.offline import bcq
 from mava.utils import lp_utils
 from mava.utils.environments.flatland_utils import flatland_env_factory
 from mava.utils.loggers import logger_utils
+from mava.utils.offline import tfrecord_transition_dataset
 
 FLAGS = flags.FLAGS
 
@@ -24,7 +24,7 @@ flags.DEFINE_string(
     str(datetime.now()),
     "Experiment identifier that can be used to continue experiments.",
 )
-flags.DEFINE_string("base_dir", "logs", "Base dir to store experiments.")
+flags.DEFINE_string("base_dir", "logs/", "Base dir to store experiments.")
 
 
 def main(_: Any) -> None:
@@ -34,7 +34,7 @@ def main(_: Any) -> None:
         _ (Any): args.
     """
 
-    # Flatland tiny environment config
+    # Flatland environment config
     rail_gen_cfg: Dict = {
         "max_num_cities": 3,
         "max_rails_between_cities": 2,
@@ -43,7 +43,7 @@ def main(_: Any) -> None:
     }
 
     flatland_env_config: Dict = {
-        "number_of_agents": 2,
+        "number_of_agents": 5,
         "width": 25,
         "height": 25,
         "rail_generator": sparse_rail_generator(**rail_gen_cfg),
@@ -58,14 +58,28 @@ def main(_: Any) -> None:
         flatland_env_factory, env_config=flatland_env_config, include_agent_info=False
     )
 
+    # Make environment spec for dataset factory
+    environment = flatland_env_factory(
+        env_config=flatland_env_config, include_agent_info=False
+    )
+    environment_spec = MAEnvironmentSpec(environment=environment)
+
+    # Dataset factory
+    dataset_factory = functools.partial(
+        tfrecord_transition_dataset,
+        path="experiments/logs/datasets/small/idqn",
+        environment_spec=environment_spec,
+        shuffle_buffer_size=800_000,
+    )
+
     # Networks factory
     network_factory = lp_utils.partial_kwargs(
-        idqn.make_default_networks, 
-        q_network_layer_sizes=(128,),
+        bcq.make_default_networks, 
+        network_layer_sizes=(128,),
         distributional=True,
+        num_atoms=101,
         vmin=-80,
-        vmax=2,
-        num_atoms=100
+        vmax=5,
     )
 
     # Checkpointer appends "Checkpoints" to checkpoint_dir
@@ -83,30 +97,23 @@ def main(_: Any) -> None:
     )
 
     # Build distributed program
-    program = idqn.IDQN(
+    program = bcq.BCQ(
+        dataset_factory=dataset_factory,
         environment_factory=environment_factory,
         network_factory=network_factory,
         logger_factory=logger_factory,
-        num_executors=1, 
-        learning_rate=5e-4,
-        max_replay_size=100_000,
+        learning_rate=1e-4,
+        threshold=0.3,
         checkpoint_subpath=checkpoint_dir,
         batch_size=32,
-        executor_variable_update_period=500,
-        checkpoint_minute_interval=7,
-        target_update_period=1000,
-        executor_exploration_scheduler_fn= ExponentialExplorationScheduler,
-        executor_exploration_scheduler_kwargs={
-            "epsilon_start": 1.0,
-            "epsilon_min": 0.05,
-            "epsilon_decay": 5e-5,
-        },
+        executor_variable_update_period=1000,
+        target_update_period=2500,
         distributional=True
     ).build()
 
     # Ensure only trainer runs on gpu, while other processes run on cpu.
     local_resources = lp_utils.to_device(
-        program_nodes=program.groups.keys(), nodes_on_gpu=[]
+        program_nodes=program.groups.keys(), nodes_on_gpu=["trainer"]
     )
 
     # Launch.
@@ -116,6 +123,7 @@ def main(_: Any) -> None:
         terminal="current_terminal",
         local_resources=local_resources,
     )
+
 
 if __name__ == "__main__":
     app.run(main)

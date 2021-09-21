@@ -44,6 +44,8 @@ class BCQFeedForwardExecutor(FeedForwardExecutor):
         agent_net_keys: Dict[str, str],
         threshold: float,
         variable_client: Optional[tf2_variable_utils.VariableClient] = None,
+        distributional: bool = False,
+        network_supports: Dict = None,
     ):
         """Initialise the system executor
 
@@ -73,6 +75,10 @@ class BCQFeedForwardExecutor(FeedForwardExecutor):
         assert threshold >= 0 and threshold <= 1
         self._threshold = threshold
 
+        # Distributional Q-learning stuff
+        self._distributional = distributional
+        self._network_supports = network_supports
+
     def _policy(
         self,
         agent: str,
@@ -99,8 +105,18 @@ class BCQFeedForwardExecutor(FeedForwardExecutor):
         # index network either on agent type or on agent id
         net_key = self._agent_net_keys[agent]
 
-        # Compute the policy, conditioned on the observation with q-network
-        q_t = self._q_networks[net_key](batched_observation)
+        # Compute q-values
+        if self._distributional:
+            # Get network support
+            support = self._network_supports[net_key]
+
+            logits = self._q_networks[net_key](batched_observation)
+            z = tf.nn.softmax(logits, axis=-1)
+            q_t = tf.reduce_sum(z * support, axis=-1)
+        else:
+            q_t = self._q_networks[net_key](batched_observation)
+
+        # Compute behaviour cloning
         g_t = tf.nn.softmax(self._g_networks[net_key](batched_observation))
         normalized_g_t = g_t / tf.reduce_max(g_t, axis=-1, keepdims=True)
 

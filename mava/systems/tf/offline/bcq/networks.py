@@ -14,18 +14,24 @@
 # limitations under the License.
 from typing import Dict, Mapping, Sequence, Union
 
+import sonnet as snt
 import tensorflow as tf
 from acme import types
 from acme.tf import utils as tf2_utils
 import acme.tf.networks as acme_networks
 
 from mava import specs as mava_specs
+from mava.components.tf import networks
 
 
 def make_default_networks(
     environment_spec: mava_specs.MAEnvironmentSpec,
     agent_net_keys: Dict[str, str],
     network_layer_sizes: Union[Dict[str, Sequence], Sequence] = None,
+    distributional: bool = False,
+    num_atoms: int = 51,
+    vmin: int = -100,
+    vmax: int = 100,
 ) -> Mapping[str, types.TensorTransformation]:
     """Default networks for BCQ.
 
@@ -49,23 +55,35 @@ def make_default_networks(
     if not network_layer_sizes:
         network_layer_sizes = (256, 256)
 
-    if isinstance(network_layer_sizes, Sequence):
-        networks_layer_sizes = {key: network_layer_sizes for key in specs.keys()}
-
-    networks = {"q_network": {}, "g_network": {}}
+    all_networks = {"q-networks": {}, "g-networks": {}, "supports": {}}
     for key, spec in specs.items():
 
         # Get total number of action dimensions from action spec.
         num_dimensions = specs[key].actions.num_values
 
-        # Create the networks.
-        q_network = acme_networks.LayerNormMLP(
-            list(networks_layer_sizes[key]) + [num_dimensions],
-            activate_final=False,
-        )
+        # If distributional
+        if distributional:
+            q_network = snt.Sequential(
+                [
+                    networks.LayerNormMLP(
+                        list(network_layer_sizes) + [num_atoms * num_dimensions],
+                        activate_final=False,
+                    ),
+                    tf.keras.layers.Reshape((num_dimensions, num_atoms)),
+                ]
+            )
+            network_support = tf.cast(
+                tf.linspace(vmin, vmax, num_atoms), dtype="float32"
+            )
+        else:
+            # Create the networks.
+            q_network = acme_networks.LayerNormMLP(
+                list(network_layer_sizes) + [num_dimensions],
+                activate_final=False,
+            )
 
         g_network = acme_networks.LayerNormMLP(
-            list(networks_layer_sizes[key]) + [num_dimensions],
+            list(network_layer_sizes) + [num_dimensions],
             activate_final=False,
         )
 
@@ -76,7 +94,8 @@ def make_default_networks(
         tf2_utils.create_variables(g_network, [obs_spec])
 
         # Store network and action selector.
-        networks["q_network"][key] = q_network
-        networks["g_network"][key] = g_network
+        all_networks["q-networks"][key] = q_network
+        all_networks["g-networks"][key] = g_network
+        all_networks["supports"][key] = network_support
 
-    return networks
+    return all_networks

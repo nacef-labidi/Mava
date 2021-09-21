@@ -70,6 +70,7 @@ class BCQ:
         eval_loop_fn: Callable = ParallelEnvironmentLoop,
         train_loop_fn_kwargs: Dict = {},
         eval_loop_fn_kwargs: Dict = {},
+        distributional: bool = False,
     ):
         """Initialise an offline MADQN system.
 
@@ -163,6 +164,7 @@ class BCQ:
                 target_update_period=target_update_period,
                 checkpoint_subpath=checkpoint_subpath,
                 checkpoint_minute_interval=checkpoint_minute_interval,
+                distributional=distributional
             ),
             trainer_fn=trainer_fn,
             executor_fn=executor_fn,
@@ -231,8 +233,7 @@ class BCQ:
         counter = counting.Counter(counter, "trainer")
 
         return self._builder.make_trainer(
-            q_networks=networks["q_network"],
-            g_networks=networks["g_network"],
+            networks=networks,
             dataset=dataset,
             counter=counter,
             logger=trainer_logger,
@@ -262,8 +263,7 @@ class BCQ:
 
         # Create the agent.
         executor = self._builder.make_executor(
-            q_networks=networks["q_network"],
-            g_networks=networks["g_network"],
+            networks=networks,
             variable_source=variable_source,
         )
 

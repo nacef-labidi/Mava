@@ -43,6 +43,7 @@ class BCQConfig:
     checkpoint: bool
     checkpoint_subpath: str
     checkpoint_minute_interval: int
+    distributional: bool
 
 
 class BCQBuilder:
@@ -76,8 +77,7 @@ class BCQBuilder:
 
     def make_executor(
         self,
-        q_networks: Dict[str, snt.Module],
-        g_networks: Dict[str, snt.Module],
+        networks: Dict[str, Dict[str, snt.Module]],
         variable_source: Optional[core.VariableSource] = None,
     ) -> core.Executor:
         """Create an executor instance.
@@ -91,29 +91,28 @@ class BCQBuilder:
             core.Executor: system executor, a collection of agents making up the part
                 of the system generating data by interacting the environment.
         """
+        # Q-networks
+        q_networks = networks["q-networks"]
+        g_networks = networks["g-networks"]
+
+        # Network supports
+        network_supports = networks["supports"]
+
         # Get agent net keys
         agent_net_keys = self._config.agent_net_keys
 
         variable_client = None
         if variable_source:
-            # Create variables
-            q_variables = {
-                net_key: q_networks[net_key].variables
-                for net_key in set(agent_net_keys.values())
-            }
-            g_variables = {
-                net_key: g_networks[net_key].variables
-                for net_key in set(agent_net_keys.values())
-            }
-            # Get new variables
+            # Make variable client
             variable_client = variable_utils.VariableClient(
                 client=variable_source,
                 variables={
-                    "q_network": q_variables,
-                    "g_network": g_variables
+                    "cheese": q_networks["train"].variables,
+                    "g_network": g_networks["train"].variables
                 },
                 update_period=self._config.executor_variable_update_period,
             )
+
 
             # Make sure not to use a random policy after checkpoint restoration by
             # assigning variables before running the environment loop.
@@ -126,12 +125,13 @@ class BCQBuilder:
             threshold=self._config.threshold,
             agent_net_keys=agent_net_keys,
             variable_client=variable_client,
+            network_supports=network_supports,
+            distributional=self._config.distributional,
         )
 
     def make_trainer(
         self,
-        q_networks: Dict[str, snt.Module],
-        g_networks: Dict[str, snt.Module],
+        networks: Dict[str, Dict[str, snt.Module]],
         dataset: Iterator[reverb.ReplaySample],
         counter: Optional[counting.Counter] = None,
         logger: Optional[types.NestedLogger] = None,
@@ -150,6 +150,13 @@ class BCQBuilder:
             core.Trainer: system trainer, that uses the collected data from the
                 executors to update the parameters of the agent networks in the system.
         """
+        # Q-network and G-network
+        q_networks = networks["q-networks"]
+        g_networks = networks["g-networks"]
+
+        # Network supports
+        network_supports = networks["supports"]
+
         agents = self._config.environment_spec.get_agent_ids()
         agent_types = self._config.environment_spec.get_agent_types()
 
@@ -162,7 +169,6 @@ class BCQBuilder:
             discount=self._config.discount,
             agent_net_keys=self._config.agent_net_keys,
             learning_rate=self._config.learning_rate,
-            huber_loss_parameter=self._config.huber_loss_parameter,
             target_update_period=self._config.target_update_period,
             threshold=self._config.threshold,
             max_gradient_norm=self._config.max_gradient_norm,
@@ -172,6 +178,8 @@ class BCQBuilder:
             checkpoint=self._config.checkpoint,
             checkpoint_subpath=self._config.checkpoint_subpath,
             checkpoint_minute_interval=self._config.checkpoint_minute_interval,
+            network_supports=network_supports,
+            distributional=self._config.distributional,
         )
 
         trainer = DetailedTrainerStatistics(

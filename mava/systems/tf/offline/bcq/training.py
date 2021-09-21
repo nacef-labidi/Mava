@@ -24,12 +24,14 @@ from typing import Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
 import reverb
 import sonnet as snt
+import trfl
 import tensorflow as tf
 import trfl
 from acme.tf import losses
 from acme.tf import utils as tf2_utils
 from acme.types import NestedArray
 from acme.utils import counting, loggers
+import tree
 
 import mava
 from mava import types as mava_types
@@ -57,7 +59,6 @@ class BCQTrainer(mava.Trainer):
         agent_net_keys: Dict[str, str],
         learning_rate: float = 1e-3,
         discount: float = 0.99,
-        huber_loss_parameter: float = 1.0,
         target_update_period: int = 100,
         max_gradient_norm: float = None,
         counter: counting.Counter = None,
@@ -65,6 +66,8 @@ class BCQTrainer(mava.Trainer):
         checkpoint: bool = True,
         checkpoint_subpath: str = "~/mava/",
         checkpoint_minute_interval: int = 15,
+        distributional: bool = False,
+        network_supports: Dict = None,
     ):
         """Initialise the trainer.
 
@@ -98,7 +101,10 @@ class BCQTrainer(mava.Trainer):
         # Internalise the hyperparameters.
         self._discount = discount
         self._target_update_period = target_update_period
-        self._huber_loss_parameter = huber_loss_parameter
+
+        # Distributional Q-learning stuff
+        self._distributional = distributional
+        self._network_supports = network_supports
 
         # Store q-networks
         self._q_networks = q_networks
@@ -139,21 +145,10 @@ class BCQTrainer(mava.Trainer):
             self._g_optimizers[key] = snt.optimizers.Adam(learning_rate)
 
         # Expose the variables.
-        self._system_network_variables: Dict[str, Dict[str, snt.Module]] = {
-            "q_network": {},
-            "g_network": {},
+        self._system_network_variables = {
+            "cheese": self._q_networks["train"].variables,
+            "g_network": self._g_networks["train"].variables
         }
-        for agent_key in self.unique_net_keys:
-            q_network_to_expose = self._q_networks[agent_key]
-            g_network_to_expose = self._g_networks[agent_key]
-
-            self._system_network_variables["q_network"][
-                agent_key
-            ] = q_network_to_expose.variables
-
-            self._system_network_variables["g_network"][
-                agent_key
-            ] = g_network_to_expose.variables
 
         # Checkpointer
         self._system_checkpointer = {}
@@ -313,23 +308,56 @@ class BCQTrainer(mava.Trainer):
                 network_losses[net_key]["g_network_loss"] = loss
 
                 # Evaluate q-networks
-                q_tm1 = self._q_networks[net_key](net_observation[net_key])
-                q_t_value = self._target_q_networks[net_key](
-                    net_next_observation[net_key]
-                )
-                q_t_selector = self._filtered_q_value(
-                    net_key, net_next_observation[net_key]
-                )
+                if self._distributional:
+                    # Get support
+                    support = self._network_supports[net_key]
 
-                # Compute the loss.
-                loss, extra = trfl.double_qlearning(
-                    q_tm1,
-                    net_action[net_key],
-                    net_reward[net_key],
-                    self._discount * net_discount[net_key],
-                    q_t_value,
-                    q_t_selector,
-                )
+                    # Compute logits
+                    logits = self._q_networks[net_key](net_observation[net_key])
+                    target_logits = self._target_q_networks[net_key](
+                        net_next_observation[net_key]
+                    )
+
+                    # Compute selector
+                    q_t_selector_logits = self._q_networks[net_key](net_next_observation[net_key])
+                    q_t_selector_dist = tf.nn.softmax(q_t_selector_logits, axis=-1)
+                    q_t_selector = tf.reduce_sum(q_t_selector_dist * support,  axis=-1)
+
+                    # Filter q-values based on g-network outputs
+                    g_t = tf.nn.softmax(self._g_networks[net_key](net_next_observation[net_key]))
+                    normalized_g_t = g_t / tf.reduce_max(g_t, axis=-1, keepdims=True)
+                    min_q = tf.reduce_min(q_t_selector, axis=-1, keepdims=True)
+                    filtered_q_t_selector = tf.where(normalized_g_t >= self._threshold, q_t_selector, min_q)
+
+                    # trfl distributional Q-learning
+                    loss, _ = trfl.categorical_dist_double_qlearning(
+                        support,
+                        logits,
+                        net_action[net_key],
+                        net_reward[net_key],
+                        self._discount * net_discount[net_key],
+                        support,
+                        target_logits,
+                        filtered_q_t_selector
+                    )
+                else:
+                    q_tm1 = self._q_networks[net_key](net_observation[net_key])
+                    q_t_value = self._target_q_networks[net_key](
+                        net_next_observation[net_key]
+                    )
+                    q_t_selector = self._filtered_q_value(
+                        net_key, net_next_observation[net_key]
+                    )
+
+                    # Compute the loss.
+                    loss, extra = trfl.double_qlearning(
+                        q_tm1,
+                        net_action[net_key],
+                        net_reward[net_key],
+                        self._discount * net_discount[net_key],
+                        q_t_value,
+                        q_t_selector,
+                    )
 
                 # loss = losses.huber(extra.td_error, self._huber_loss_parameter)
                 loss = tf.reduce_mean(loss)  # []
@@ -430,12 +458,6 @@ class BCQTrainer(mava.Trainer):
         Returns:
             Dict[str, Dict[str, np.ndarray]]: network variables
         """
-        variables: Dict[str, Dict[str, np.ndarray]] = {}
-        for network_type in names:
-            variables[network_type] = {
-                agent: tf2_utils.to_numpy(
-                    self._system_network_variables[network_type][agent]
-                )
-                for agent in self.unique_net_keys
-            }
+        variables = tree.map_structure(tf2_utils.to_numpy, self._system_network_variables)
+
         return variables
