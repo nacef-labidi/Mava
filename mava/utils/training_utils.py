@@ -1,5 +1,5 @@
 import os
-from typing import Any, Dict, Iterable, Sequence, Union, List, Tuple
+from typing import Any, Dict, Iterable, List, Sequence, Tuple, Union
 
 import sonnet as snt
 import tensorflow as tf
