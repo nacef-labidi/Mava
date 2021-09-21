@@ -384,6 +384,14 @@ class ParallelEnvironmentLoop(acme.core.Worker):
 
             timestep = self._environment.step(env_actions)
 
+            # Delete this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            # print("Delete this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            # if type(actions) == tuple:
+            #     # print("actions before: ", actions)
+            #     actions = (env_actions, env_actions)
+            # print("actions after: ", actions)
+            # Delete this!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
             if type(timestep) == tuple:
                 timestep, env_extras = timestep
             else:

@@ -552,6 +552,7 @@ class MAD4PGBaseRecurrentTrainer(MADDPGBaseRecurrentTrainer):
                 # Remove the last sequence step for the normal network
                 obs_comb, dims = train_utils.combine_dim(obs_trans_feed)
                 act_comb, _ = train_utils.combine_dim(action_feed)
+
                 q_values = self._critic_networks[net_key](obs_comb, act_comb)
                 q_values.set_dimensions(dims)
 
